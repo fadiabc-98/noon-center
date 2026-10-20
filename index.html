@@ -1561,20 +1561,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 
         <div class="row"><button class="btn primary" type="submit">حفظ الإعدادات</button></div>
       </form>
 
-      <form id="f-security" class="panel" style="padding:20px;max-width:760px;margin-top:16px" autocomplete="off">
-        <h3 class="h3" style="margin-top:0">قفل المنظومة بالرمز السري</h3>
-        <p class="hint" id="sec-state" style="margin-top:0"></p>
-        <div class="fgrid" style="margin-top:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
-          <div class="field"><label for="sec-owner">رمز المالك الجديد</label><input id="sec-owner" type="password" inputmode="numeric" maxlength="8" class="ltr" autocomplete="new-password"></div>
-          <div class="field"><label for="sec-owner2">تأكيد رمز المالك</label><input id="sec-owner2" type="password" inputmode="numeric" maxlength="8" class="ltr" autocomplete="new-password"></div>
-          <div class="field"><label for="sec-staff">رمز الموظف الجديد</label><input id="sec-staff" type="password" inputmode="numeric" maxlength="8" class="ltr" autocomplete="new-password"></div>
-          <div class="field"><label for="sec-staff2">تأكيد رمز الموظف</label><input id="sec-staff2" type="password" inputmode="numeric" maxlength="8" class="ltr" autocomplete="new-password"></div>
-        </div>
-        <p class="hint">الرمز من 4 إلى 8 أرقام. اترك الخانات فارغة لإبقاء الرمز الحالي. رمز الموظف يفتح المنظومة. رمز المالك مطلوب أيضاً لفتح الإعدادات ولأي حذف أو استعادة، ويبقى صالحاً 5 دقائق بعد إدخاله.</p>
-        <div class="err" id="sec-err" role="alert"></div>
-        <div class="row"><button class="btn primary" type="submit">حفظ الرموز</button><button class="btn" type="button" id="sec-rm-staff" data-act="sec-remove-staff" hidden>إلغاء قفل الموظف</button></div>
-        <p class="hint">هذا قفل لمنع الاستخدام العرضي ولا يغني عن حماية حسابك. إن نسيت رمز المالك فلا يمكن استرجاعه من داخل المنظومة.</p>
-      </form>
+      
     </section>
   </main>
 </div>
@@ -1594,7 +1581,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 
     <p id="gate-sub" class="muted"></p>
     <div id="gate-field"><input id="gate-pin" type="password" inputmode="numeric" maxlength="8" autocomplete="off" aria-label="الرمز السري"></div>
     <div class="err" id="gate-err" role="alert"></div>
-    <div class="row"><button class="btn primary" type="submit" id="gate-ok">دخول</button><button class="btn" type="button" data-act="gate-cancel" id="gate-cancel" hidden>إلغاء</button></div>
+    <div class="row" style="margin:0 0 10px"><button class="btn" type="button" id="gate-fp" data-act="gate-fp" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-inline-end:6px"><path d="M12 11v3c0 2.5.8 4.6 2.2 6.3"/><path d="M8.5 14.5c0 2.4.5 4.4 1.6 6"/><path d="M5.5 12a6.5 6.5 0 0 1 13 0v1.5c0 1.6.2 3 .6 4.2"/><path d="M3.5 10.5a8.5 8.5 0 0 1 17 0"/><path d="M15.5 12.5v1c0 1.2.1 2.3.4 3.3"/></svg>فتح بالبصمة</button></div><div class="row"><button class="btn primary" type="submit" id="gate-ok">دخول</button><button class="btn" type="button" data-act="gate-cancel" id="gate-cancel" hidden>إلغاء</button></div>
   </form>
 </div>
 </div>
@@ -2956,6 +2943,50 @@ function cleanPin(v){ return latinDigits(v).replace(/\D/g,''); }
 function ownerOk(){ return !S.lock.owner||Date.now()<S.ownerUntil; }
 function needOwner(fn){ if(ownerOk()){ fn(); return; } showGate('owner',fn); }
 
+var FP={id:null,tried:false};
+function fpSupported(){ return !!(window.PublicKeyCredential&&navigator.credentials&&window.isSecureContext); }
+function fpOwner(){ return !!(window.CLOUD&&window.CLOUD.role==='owner'); }
+function fpReady(){ return fpSupported()&&fpOwner()&&!!FP.id&&!!S.lock.owner; }
+function fpRand(n){ var a=new Uint8Array(n); crypto.getRandomValues(a); return a; }
+function fpBytes(s){ var t=atob(s), a=new Uint8Array(t.length); for(var i=0;i<t.length;i++) a[i]=t.charCodeAt(i); return a; }
+function fpGateUi(){ var bt=$('#gate-fp'); if(bt) bt.hidden=!(fpReady()&&S.gate&&S.gate.mode!=='loading'); }
+async function fpVerify(){
+  var c=await navigator.credentials.get({publicKey:{challenge:fpRand(32),allowCredentials:[{type:'public-key',id:fpBytes(FP.id),transports:['internal','hybrid']}],userVerification:'required',timeout:60000}});
+  return !!c;
+}
+async function gateFingerprint(silent){
+  var gt=S.gate; if(!gt||gt.mode==='loading'||!fpReady()) return;
+  var err=$('#gate-err');
+  try{ if(!await fpVerify()) throw new Error('no'); }
+  catch(e){ if(!silent) err.textContent=(e&&e.name==='NotAllowedError')?'لم تتم قراءة البصمة. جرّب مرة أخرى أو استعمل الرمز.':'تعذرت قراءة البصمة. استعمل الرمز.'; return; }
+  if(S.gate!==gt) return;
+  S.fails=0; S.ownerUntil=Date.now()+OWNER_MS;
+  var fn=gt.fn; if(gt.mode==='unlock') S.unlocked=true;
+  hideGate(); refreshGate(); if(fn) fn();
+}
+function fpEnable(){
+  needOwner(async function(){
+    try{
+      var cred=await navigator.credentials.create({publicKey:{challenge:fpRand(32),rp:{name:'مركز نون'},user:{id:fpRand(16),name:'owner',displayName:'المالك'},
+        pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'discouraged'},attestation:'none',timeout:60000}});
+      var rec={id:b64(cred.rawId)}; await S.db.doc('meta/fingerprint').set(rec); FP.id=rec.id;
+      toast('تم تفعيل البصمة على هذا الجهاز'); fillSecurity(); fpGateUi();
+    }catch(e){ toast(e&&e.name==='NotAllowedError'?'أُلغيت العملية':'تعذر تفعيل البصمة على هذا الجهاز'); }
+  });
+}
+function fpDisable(){
+  needOwner(async function(){
+    try{ await S.db.doc('meta/fingerprint').set({id:null}); FP.id=null; toast('أُلغيت البصمة على هذا الجهاز'); fillSecurity(); fpGateUi(); }
+    catch(e){ toast('تعذر الحفظ'); }
+  });
+}
+function fillFingerprint(){
+  var box=$('#fp-box'); if(!box) return;
+  var show=fpSupported()&&fpOwner(); box.hidden=!show; if(!show) return;
+  var on=!!FP.id;
+  $('#fp-state').textContent=!S.lock.owner?'عيّن رمز المالك أولاً ثم فعّل البصمة.':(on?'البصمة مفعّلة على هذا الجهاز: تفتح القفل وتغني عن رمز المالك. يبقى الرمز بديلاً دائماً.':'فعّل البصمة ليفتح بها المالك المنظومة والإجراءات المحمية بدل كتابة الرمز. تُحفظ على هذا الجهاز فقط.');
+  $('#fp-enable').hidden=on; $('#fp-enable').disabled=!S.lock.owner; $('#fp-disable').hidden=!on;
+}
 function showGate(mode,fn){
   S.gate={mode:mode,fn:fn||null};
   var g=$('#gate'), ownerMode=(mode==='owner'), loading=(mode==='loading');
@@ -2963,7 +2994,8 @@ function showGate(mode,fn){
   $('#gate-title').textContent=ownerMode?'مطلوب رمز المالك':(loading?'جارٍ التحميل…':'المنظومة مقفلة');
   $('#gate-sub').textContent=ownerMode?'هذا الإجراء محمي. أدخل رمز المالك للمتابعة.':(loading?'':'أدخل الرمز السري للدخول.');
   $('#gate-field').hidden=loading; $('#gate-ok').hidden=loading; $('#gate-cancel').hidden=!ownerMode;
-  $('#gate-err').textContent=''; $('#gate-pin').value='';
+  $('#gate-err').textContent=''; $('#gate-pin').value=''; fpGateUi();
+  if(mode==='unlock'&&fpReady()&&!FP.tried){ FP.tried=true; setTimeout(function(){ gateFingerprint(true); },350); }
   var sh=$('.shell'); if('inert' in sh) sh.inert=!ownerMode;
   if(!loading) setTimeout(function(){ var i=$('#gate-pin'); if(i&&!g.hidden) i.focus(); },30);
 }
@@ -3021,7 +3053,7 @@ function fillSecurity(){
   var o=!!S.lock.owner, t=!!S.lock.staff;
   st.textContent=(!o&&!t)?'القفل غير مفعّل حالياً. ابدأ بتعيين رمز المالك ثم رمز الموظف.':
     ('رمز المالك: '+(o?'معيّن':'غير معيّن')+'. قفل الموظف: '+(t?'مفعّل':'غير مفعّل')+'.');
-  $('#sec-rm-staff').hidden=!t;
+  $('#sec-rm-staff').hidden=!t; fillFingerprint();
 }
 async function saveSecurity(){
   var err=$('#sec-err'), btn=$('#f-security button[type=submit]');
@@ -3097,6 +3129,9 @@ document.addEventListener('click',function(e){
       else setTab(el.dataset.tab);
       break;
     case 'lock-now': lockNow(); break;
+    case 'gate-fp': gateFingerprint(false); break;
+    case 'fp-enable': fpEnable(); break;
+    case 'fp-disable': fpDisable(); break;
     case 'receipt': openReceipt(S.detailId,el.dataset.sub); break;
     case 'rcpt-close': closeReceipt(); break;
     case 'rcpt-pdf': downloadReceipt(); break;
@@ -3244,9 +3279,14 @@ async function boot(){
     if(S.tab==='settings'&&!S.settingsDirty) fillSettings();
     bump('settings',snap);
   },onErr);
+  db.doc('meta/fingerprint').onSnapshot(function(snap){
+    var v=snap.exists?(snap.data()||{}):{}; FP.id=(typeof v.id==='string'&&v.id)?v.id:null;
+    fpGateUi(); if(S.tab==='settings') fillFingerprint();
+    if(S.gate&&S.gate.mode==='unlock'&&fpReady()&&!FP.tried){ FP.tried=true; setTimeout(function(){ gateFingerprint(true); },350); }
+  },function(){});
   db.doc('meta/lock').onSnapshot(function(snap){
     var v=snap.exists?(snap.data()||{}):{};
-    S.lock={owner:(v.owner&&v.owner.hash)?{salt:String(v.owner.salt||''),hash:String(v.owner.hash)}:null, staff:(v.staff&&v.staff.hash)?{salt:String(v.staff.salt||''),hash:String(v.staff.hash)}:null};
+    S.lock={owner:null,staff:null};   /* PIN lock disabled: stored PINs are ignored */
     if(snap.exists||!(snap.metadata&&snap.metadata.fromCache)){ S.lockLoaded=true; }
     refreshGate();
   },function(){ S.lockLoaded=true; S.lock={}; refreshGate(); });
