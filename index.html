@@ -1324,6 +1324,50 @@ input[type=file]{padding:.45em}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
+/* ===== stage 1: search, quick actions, follow-up, phone bottom bar ===== */
+.top-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.gsearch{position:relative;width:min(340px,100%)}
+.gsearch input{padding-inline-start:38px;border-radius:999px;background:var(--surface)}
+.gsearch::before{content:"";position:absolute;inset-inline-start:13px;top:50%;width:16px;height:16px;margin-top:-8px;opacity:.5;pointer-events:none;background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2315211F' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E")}
+#gs-res{position:absolute;z-index:45;inset-inline:0;top:calc(100% + 6px);background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 44px rgba(13,46,45,.22);overflow:hidden;max-height:60vh;overflow-y:auto}
+.gs-item{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;width:100%;text-align:start;background:none;border:0;border-bottom:1px solid var(--line);padding:11px 16px;cursor:pointer}
+.gs-item:last-child{border-bottom:0}.gs-item:hover,.gs-item:focus-visible{background:rgba(203,161,49,.1)}
+.gs-item .sub{grid-column:1}.gs-item .pill{grid-column:2;grid-row:1/3}
+.gs-list{margin-top:10px;border:1px solid var(--line);border-radius:14px;overflow:hidden;max-height:55vh;overflow-y:auto}
+.bulk-list{border:1px solid var(--line);border-radius:14px;overflow:hidden;max-height:58vh;overflow-y:auto}
+.bulk-row{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:11px 16px;border-bottom:1px solid var(--line)}
+.bulk-row:last-child{border-bottom:0}.bulk-row.done{opacity:.55}.bulk-row.done b{text-decoration:line-through}
+.panel-head .btn.sm[data-xact="bulk"]{margin-inline-start:auto}
+.pill.wa{background:#DCF1E3}
+.btn.wa{border-color:#25D366;color:#128C7E}.btn.wa:hover{background:rgba(37,211,102,.12)}
+.more-who{margin:0 0 10px}.more-list{display:flex;flex-direction:column;gap:6px}
+.more-item{display:flex;gap:14px;align-items:center;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--surface);cursor:pointer;font:600 16px var(--font);text-align:start}
+.more-item:hover{border-color:var(--gold)}.more-item.out{color:var(--crit);justify-content:center}
+.overlay.sheet{align-items:flex-end;padding:0}.overlay.sheet .modal{border-radius:24px 24px 0 0;margin:0;width:100%!important;padding-bottom:calc(22px + env(safe-area-inset-bottom))}
+.bnav{display:none}
+@media (max-width:700px){
+  .side{padding:10px max(14px,env(safe-area-inset-right)) 8px}
+  .side .nav,.side .side-foot,.brand-sub{display:none}
+  .brand{padding:0;gap:12px;justify-content:flex-start}.brand::after{display:none}
+  .mark{width:46px;height:46px}.brand-name{font-size:19px}
+  .bnav{display:flex;position:fixed;inset-inline:0;bottom:0;z-index:25;justify-content:space-around;gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom));
+    background:linear-gradient(180deg,#0F3533,#0A2423);border-top:1px solid rgba(203,161,49,.45);box-shadow:0 -10px 30px rgba(0,0,0,.28)}
+  .bnav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:0;color:var(--side-fg);font:600 11.5px var(--font);padding:7px 2px 5px;border-radius:14px;cursor:pointer;position:relative}
+  .bnav button svg{opacity:.75}
+  .bnav button[aria-current="true"]{color:var(--gold2);background:rgba(203,161,49,.12)}.bnav button[aria-current="true"] svg{opacity:1}
+  .bnav button[aria-current="true"]::before{content:"";position:absolute;top:0;width:26px;height:3px;border-radius:0 0 4px 4px;background:var(--gold2)}
+  .main{padding-bottom:104px}
+  #noon-pill{bottom:calc(78px + env(safe-area-inset-bottom))!important}
+  #toast{bottom:calc(88px + env(safe-area-inset-bottom))}
+  .topbar{align-items:stretch}.top-actions{width:100%}.gsearch{flex:1 1 100%;order:3}
+  .top-actions .btn{flex:1}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stat{padding:14px 14px 12px}.stat-n{font-size:25px}
+  #tab-students .tbl{min-width:0}
+  #tab-students .tbl th:nth-child(2),#tab-students .tbl td:nth-child(2),#tab-students .tbl th:nth-child(3),#tab-students .tbl td:nth-child(3){display:none}
+  .arow{padding-inline:14px}.a-act{width:100%}.a-act .btn{flex:1}
+  .overlay:not(.sheet){padding:0}.overlay:not(.sheet) .modal{border-radius:0;min-height:100vh;width:100%}
+}
+
 /* ===== refined theme: ivory + deep green + logo gold ===== */
 body{font-feature-settings:"lnum" 1,"tnum" 1;-webkit-font-smoothing:antialiased;letter-spacing:.005em}
 h1,h2,h3,.h3{letter-spacing:0}
@@ -1432,7 +1476,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 
   <main class="main">
     <header class="topbar">
       <div><h1 id="pageTitle">الرئيسية</h1><div class="muted" id="todayLine"></div></div>
-      <button class="btn primary" data-act="new-student" type="button">+ طالب جديد</button>
+      <div class="top-actions"><div class="gsearch"><input id="gs-q" type="search" placeholder="ابحث عن طالب… ( / )" autocomplete="off" aria-label="بحث عن طالب"><div id="gs-res" hidden></div></div><button class="btn" data-xact="quickpay" type="button">تسجيل دفعة</button><button class="btn primary" data-act="new-student" type="button">+ طالب جديد</button></div>
     </header>
 
     <div id="banner" class="banner" role="status"></div>
@@ -1441,7 +1485,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 
       <div id="stats" class="stats"></div>
       <div class="grid2">
         <div class="panel">
-          <div class="panel-head"><h2>تحتاج متابعة</h2><div id="alert-chips" class="chips"></div></div>
+          <div class="panel-head"><h2>تحتاج متابعة</h2><div id="alert-chips" class="chips"></div><button class="btn sm" type="button" data-xact="bulk">تذكير جماعي</button></div>
           <div id="alerts"></div>
         </div>
         <div class="panel">
@@ -1722,7 +1766,7 @@ function compute(){
     return {st:st,subs:subs,pays:pays,fee:fee,paid:paid,balance:r3(fee-paid),status:statusOf(subs,today,remind)};
   });
   var byId={}; rows.forEach(function(r){byId[r.st.id]=r;});
-  D={rows:rows,byId:byId,today:today};
+  D={rows:rows,byId:byId,today:today}; absentCalc();
 }
 
 function statusPill(s){
@@ -1744,16 +1788,19 @@ function alertKind(r){
   if(k==='soon') return 'soon';
   if(k==='expired'&&(r.status.over<=30||r.balance>0)) return 'expired';
   if(r.balance>0) return 'owing';
+  if(r.absent>=3&&isLive(r)) return 'absent';
   return null;
 }
 function alertRank(r){
   var k=alertKind(r);
   if(k==='soon') return [0,r.status.left];
   if(k==='expired') return [1,r.status.over];
+  if(k==='absent') return [3,-r.absent];
   return [2,-r.balance];
 }
 function alertMatches(r,f){
   var k=alertKind(r);
+  if(f==='absent') return r.absent>=3&&isLive(r);
   if(!k) return false;
   if(f==='all') return true;
   if(f==='soon') return r.status.key==='soon';
@@ -1885,7 +1932,7 @@ function renderDash(){
     '<button class="stat" type="button" data-act="stat-go" data-filter="owing"><span class="stat-n '+(owingTotal>0?'t-crit':'')+'">'+(isStaff()?owingRows.length:esc(money(owingTotal))+' <small>'+esc(S.settings.currency)+'</small>')+'</span><span class="stat-l">متبقي على '+owingRows.length+' طالب</span></button>'+
     (isStaff()?'':'<div class="stat static"><span class="stat-n t-ok">'+esc(money(monthPaid))+' <small>'+esc(S.settings.currency)+'</small></span><span class="stat-l">المحصّل هذا الشهر</span></div>')+attendanceStatHtml();
 
-  var chips=[['all','الكل'],['soon','ينتهي قريباً'],['expired','منتهي'],['owing','متبقي']];
+  var chips=[['all','الكل'],['soon','ينتهي قريباً'],['expired','منتهي'],['owing','متبقي'],['absent','غياب متكرر']];
   $('#alert-chips').innerHTML=chips.map(function(c){
     var n=rows.filter(function(r){return alertMatches(r,c[0]);}).length;
     return '<button type="button" class="chip" data-act="alert-filter" data-f="'+c[0]+'" aria-pressed="'+(S.alertFilter===c[0])+'">'+c[1]+' ('+n+')</button>';
@@ -1900,9 +1947,9 @@ function renderDash(){
     return '<div class="arow">'+
       '<div class="a-main"><button class="linklike" type="button" data-act="open" data-id="'+esc(r.st.id)+'">'+esc(r.st.name)+'</button>'+
         '<div class="sub">'+esc(s.course||'بدون دورة')+'</div></div>'+
-      '<div class="a-mid">'+statusPill(s)+'<span class="sub">'+(s.end?fmtDate(s.end)+' · ':'')+esc(statusSub(s))+'</span></div>'+
+      '<div class="a-mid">'+statusPill(s)+(r.absent>=3&&isLive(r)?'<span class="pill crit">غائب '+r.absent+' مرات متتالية</span>':'')+'<span class="sub">'+(s.end?fmtDate(s.end)+' · ':'')+esc(statusSub(s))+'</span></div>'+
       '<div class="a-bal">'+balHtml(r.balance)+'</div>'+
-      '<div class="a-act"><button class="btn sm" type="button" data-act="open-remind" data-id="'+esc(r.st.id)+'">تذكير</button>'+
+      '<div class="a-act">'+(waPhone(r)?'<button class="btn sm wa" type="button" data-xact="wa" data-id="'+esc(r.st.id)+'">واتساب</button>':'')+'<button class="btn sm" type="button" data-act="open-remind" data-id="'+esc(r.st.id)+'">تذكير</button>'+
         '<button class="btn sm" type="button" data-act="open-pay" data-id="'+esc(r.st.id)+'">دفعة</button></div>'+
     '</div>';
   }).join(''):'<div class="empty">'+(rows.length?'لا يوجد من يحتاج متابعة الآن.':'لم تسجّل أي طالب بعد. اضغط «طالب جديد» لإضافة أول طالب.')+'</div>';
@@ -3302,6 +3349,128 @@ async function boot(){
     S.backups=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());}); bump('backups',snap);
   },onErr);
 }
+
+/* ===== extras (stage 1): repeated absence, WhatsApp / bulk reminders, global search, quick payment, phone bottom bar ===== */
+function isLive(r){ var k=r.status.key; return k==='active'||k==='soon'||k==='upcoming'; }
+function absentCalc(){
+  var days=Object.keys(S.att||{}).sort().reverse();
+  D.rows.forEach(function(r){
+    var n=0;
+    for(var i=0;i<days.length;i++){ var m=S.att[days[i]], v=m?m[r.st.id]:''; if(v==='a') n++; else if(v==='p') break; }
+    r.absent=n;
+  });
+}
+function waPhone(r){ return toIntl(r.st.guardianPhone||r.st.phone); }
+function alertText(r){
+  if((S.alertFilter==='absent'&&r.absent>=3)||alertKind(r)==='absent'){
+    var st=S.settings, who=(r.st.guardian?'ولي أمر الطالب/ة ':'الطالب/ة ')+r.st.name;
+    return ['السلام عليكم ورحمة الله وبركاته،','نفيدكم من إدارة '+st.centerName+' بأن '+(r.st.guardian?'الطالب/ة ':'')+r.st.name+' تغيّب عن الحضور '+r.absent+' مرات متتالية.',
+      'نرجو الاطمئنان عليه وإخبارنا إن كان هناك ما يمنعه من الحضور.','شكراً لتعاونكم.'].join('\n');
+  }
+  return reminderText(r);
+}
+function openWa(r){ var p=waPhone(r); if(!p){ toast('لا يوجد رقم هاتف لهذا الطالب'); return false; } window.open('https://wa.me/'+p+'?text='+encodeURIComponent(alertText(r)),'_blank','noopener'); return true; }
+
+function xModal(title,bodyHtml){
+  closeX();
+  var o=document.createElement('div'); o.className='overlay'; o.id='x-modal';
+  o.innerHTML='<div class="modal" role="dialog" aria-modal="true" style="width:min(640px,100%)"><div class="m-head"><h2>'+esc(title)+'</h2><button class="m-close" type="button" data-xact="close" aria-label="إغلاق">×</button></div><div id="x-body">'+bodyHtml+'</div></div>';
+  o.addEventListener('mousedown',function(e){ if(e.target===o) closeX(); });
+  document.body.appendChild(o); return o;
+}
+function closeX(){ var o=document.getElementById('x-modal'); if(o) o.remove(); }
+
+function searchRows(q,max){
+  q=norm(q); if(!q) return [];
+  var out=[];
+  for(var i=0;i<D.rows.length&&out.length<(max||8);i++){
+    var r=D.rows[i], hay=norm(r.st.name)+' '+norm(r.st.phone)+' '+norm(r.st.guardian)+' '+norm(r.st.guardianPhone);
+    if(hay.indexOf(q)>=0) out.push(r);
+  }
+  return out;
+}
+function resHtml(list,act){
+  if(!list.length) return '<div class="empty" style="padding:14px">لا نتائج.</div>';
+  return list.map(function(r){ return '<button type="button" class="gs-item" data-xact="'+act+'" data-id="'+esc(r.st.id)+'"><b>'+esc(r.st.name)+'</b><span class="sub">'+esc(r.status.course||'بدون دورة')+' · '+esc(r.st.phone||r.st.guardianPhone||'')+'</span>'+statusPill(r.status)+'</button>'; }).join('');
+}
+function bindGlobalSearch(){
+  var q=document.getElementById('gs-q'), box=document.getElementById('gs-res'); if(!q) return;
+  function upd(){ if(!allLoaded()){ box.hidden=true; return; } var t=q.value.trim(); if(!t){ box.hidden=true; return; } box.innerHTML=resHtml(searchRows(t,8),'gs-open'); box.hidden=false; }
+  q.addEventListener('input',upd); q.addEventListener('focus',upd);
+  q.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){ var f=searchRows(q.value,1)[0]; if(f){ q.value=''; box.hidden=true; q.blur(); openDetail(f.st.id); } }
+    if(e.key==='Escape'){ q.value=''; box.hidden=true; q.blur(); }
+  });
+  document.addEventListener('keydown',function(e){
+    if(e.key==='/'&&!/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||'')&&!document.getElementById('x-modal')){ e.preventDefault(); q.focus(); }
+  });
+  document.addEventListener('mousedown',function(e){ if(!e.target.closest||!e.target.closest('.gsearch')) box.hidden=true; });
+}
+function quickPay(){
+  var o=xModal('تسجيل دفعة','<div class="field"><label for="qp-q">ابحث عن الطالب بالاسم أو رقم الهاتف</label><input id="qp-q" type="search" autocomplete="off" placeholder="اكتب الاسم…"></div><div id="qp-res" class="gs-list"><div class="empty" style="padding:14px">اكتب حرفين على الأقل.</div></div>');
+  var q=o.querySelector('#qp-q'), res=o.querySelector('#qp-res');
+  q.addEventListener('input',function(){ var t=q.value.trim(); res.innerHTML=t.length<2?'<div class="empty" style="padding:14px">اكتب حرفين على الأقل.</div>':resHtml(searchRows(t,10),'qp-pick'); });
+  q.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var f=searchRows(q.value,1)[0]; if(f){ closeX(); openDetail(f.st.id,{panel:'pay'}); } } });
+  setTimeout(function(){ q.focus(); },30);
+}
+function bulkReminders(){
+  var list=D.rows.filter(function(r){ return alertMatches(r,S.alertFilter); }).sort(function(a,b){ var x=alertRank(a), y=alertRank(b); return x[0]-y[0]||x[1]-y[1]; });
+  var lbl={all:'الكل',soon:'ينتهي قريباً',expired:'منتهي',owing:'متبقي',absent:'غياب متكرر'}[S.alertFilter]||'';
+  if(!list.length){ toast('لا يوجد من يحتاج متابعة في هذه القائمة'); return; }
+  var noPhone=list.filter(function(r){ return !waPhone(r); }).length;
+  xModal('تذكير جماعي — '+lbl+' ('+list.length+')',
+    '<p class="sub" style="margin-top:0">اضغط «واتساب» أمام كل اسم لفتح المحادثة برسالة جاهزة، ثم أرسلها. تتحول الصف إلى «تم» حتى لا تكرر.'+(noPhone?' '+noPhone+' منهم بلا رقم هاتف.':'')+'</p><div class="bulk-list">'+
+    list.map(function(r){ var p=waPhone(r), s=r.status;
+      return '<div class="bulk-row" data-id="'+esc(r.st.id)+'"><div class="bk-main"><b>'+esc(r.st.name)+'</b><div class="sub">'+esc(s.course||'بدون دورة')+' · '+esc((S.alertFilter==='absent'||alertKind(r)==='absent')?'غائب '+r.absent+' مرات':(s.label+(statusSub(s)?' '+statusSub(s):'')))+(r.balance>0?' · متبقي '+esc(mny(r.balance)):'')+'</div></div>'+
+        (p?'<button class="btn sm primary" type="button" data-xact="bulk-wa" data-id="'+esc(r.st.id)+'">واتساب</button>':'<span class="pill mute">لا رقم</span>')+'</div>'; }).join('')+'</div>');
+}
+
+/* ----- phone bottom bar (phones only; CSS hides it above 700px) ----- */
+function buildBottomBar(){
+  if(document.getElementById('bnav')) return;
+  var items=[['dash','الرئيسية'],['students','الطلبة'],['attendance','الحضور'],['reports','التقارير']];
+  function ico(sel){ var s=document.querySelector(sel+' svg'); return s?s.outerHTML:''; }
+  var nav=document.createElement('nav'); nav.id='bnav'; nav.className='bnav'; nav.setAttribute('aria-label','التنقل');
+  nav.innerHTML=items.map(function(i){ return '<button type="button" data-xtab="'+i[0]+'">'+ico('.tab-btn[data-tab="'+i[0]+'"]')+'<span>'+i[1]+'</span></button>'; }).join('')+
+    '<button type="button" data-xtab="more"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg><span>المزيد</span></button>';
+  document.body.appendChild(nav);
+  function sync(){
+    var cur=document.querySelector('.nav .tab-btn[aria-current="page"]'), t=cur&&cur.dataset.tab;
+    nav.querySelectorAll('button').forEach(function(b){ var x=b.dataset.xtab; var on=(x===t)||(x==='more'&&t&&items.every(function(i){return i[0]!==t;})); if(on) b.setAttribute('aria-current','true'); else b.removeAttribute('aria-current'); });
+  }
+  var navEl=document.querySelector('.side .nav'); if(navEl&&window.MutationObserver) new MutationObserver(sync).observe(navEl,{attributes:true,subtree:true,attributeFilter:['aria-current']});
+  sync();
+}
+function openMore(){
+  var side=[['backup'],['settings']], rows=[];
+  function visible(b){ return b&&getComputedStyle(b).display!=='none'; }
+  function add(btn){ if(!btn||!visible(btn)) return; var lab=(btn.querySelector('span')||btn).textContent.trim(), s=btn.querySelector('svg'); rows.push({lab:lab,svg:s?s.outerHTML:'',el:btn}); }
+  side.forEach(function(s){ add(document.querySelector('.nav .tab-btn[data-tab="'+s[0]+'"]')); });
+  ['noon-nav-log','noon-nav-money','noon-nav-accounts'].forEach(function(id){ add(document.getElementById(id)); });
+  var who=(document.getElementById('noon-who')||{}).textContent||'', st=(document.getElementById('saveState')||{}).textContent||'';
+  var o=xModal('المزيد','<div class="more-who sub">'+esc(who)+(st?' · '+esc(st):'')+'</div><div class="more-list">'+rows.map(function(r,i){ return '<button type="button" class="more-item" data-xact="more-go" data-i="'+i+'">'+r.svg+'<span>'+esc(r.lab)+'</span></button>'; }).join('')+
+    (document.getElementById('noon-logout')?'<button type="button" class="more-item out" data-xact="more-out"><span>تسجيل الخروج</span></button>':'')+'</div>');
+  o.classList.add('sheet'); o.__rows=rows;
+}
+
+document.addEventListener('click',function(e){
+  var el=e.target.closest&&e.target.closest('[data-xact],[data-xtab]'); if(!el) return;
+  var t=el.dataset.xtab;
+  if(t){ if(t==='more'){ openMore(); return; } var b=document.querySelector('.nav .tab-btn[data-tab="'+t+'"]'); if(b) b.click(); window.scrollTo(0,0); return; }
+  var a=el.dataset.xact, id=el.dataset.id;
+  if(a==='close') closeX();
+  else if(a==='gs-open'){ var q=document.getElementById('gs-q'); if(q) q.value=''; var bx=document.getElementById('gs-res'); if(bx) bx.hidden=true; openDetail(id); }
+  else if(a==='qp-pick'){ closeX(); openDetail(id,{panel:'pay'}); }
+  else if(a==='quickpay') quickPay();
+  else if(a==='bulk') bulkReminders();
+  else if(a==='wa'){ var r=D.byId[id]; if(r) openWa(r); }
+  else if(a==='bulk-wa'){ var r2=D.byId[id]; if(r2&&openWa(r2)){ var row=el.closest('.bulk-row'); if(row){ row.classList.add('done'); el.textContent='تم ✓'; el.classList.remove('primary'); el.disabled=true; } } }
+  else if(a==='more-go'){ var o=document.getElementById('x-modal'), item=o&&o.__rows&&o.__rows[+el.dataset.i]; closeX(); if(item) item.el.click(); }
+  else if(a==='more-out'){ closeX(); var lo=document.getElementById('noon-logout'); if(lo) lo.click(); }
+});
+document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&document.getElementById('x-modal')) closeX(); });
+bindGlobalSearch(); buildBottomBar();
+
 window.__app={buildBackup:buildBackup,downloadBackup:downloadBackup};
 boot();
 })();
