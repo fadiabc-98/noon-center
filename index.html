@@ -111,7 +111,9 @@
 
 </script>
 <script>
-window.NOON_CONFIG={url:'https://fboasldbuwclpzfefekw.supabase.co',key:'sb_publishable_ytR-vV8dro5Rf6ddTRq1Zw_drMfUoyR',pollMs:5000};
+window.NOON_CONFIG={url:'https://fboasldbuwclpzfefekw.supabase.co',key:'sb_publishable_ytR-vV8dro5Rf6ddTRq1Zw_drMfUoyR',pollMs:5000,
+  // Password-only login: the page tries these two accounts with the password typed. Emails are identifiers, not secrets.
+  accounts:['fadiabc90@gmail.com','mrkznoon@gmail.com']};
 
 </script>
 <script>
@@ -125,6 +127,8 @@ window.NOON_CONFIG={url:'https://fboasldbuwclpzfefekw.supabase.co',key:'sb_publi
 var CFG=window.NOON_CONFIG||{};
 var BASE=String(CFG.url||'').replace(/\/+$/,''), KEY=String(CFG.key||'');
 var POLL_MS=CFG.pollMs||5000;
+var ACCOUNTS=(CFG.accounts||[]).filter(Boolean);   // password-only login: the page tries these accounts with the typed password
+var LS_LAST='noon-last-account', LS_FAILS='noon-login-fails';
 var LS_SESSION='noon-session-v1', LS_DEVICE='noon-device-name';
 var localClaude=window.claude;                 // IndexedDB shim, kept for device-local items
 var session=null, profile=null, lastMarker=null, lastOkAt=0, pollTimer=null, started=false;
@@ -241,30 +245,40 @@ async function signOut(){
 
 /* ---------- login screen ---------- */
 var loginResolve=null;
+function lockLeft(){ try{ var f=JSON.parse(lsGet(LS_FAILS)||'null'); if(f&&f.until>Date.now()) return Math.ceil((f.until-Date.now())/1000); }catch(e){} return 0; }
+function noteFail(){ var f={n:0,until:0}; try{ f=JSON.parse(lsGet(LS_FAILS)||'null')||f; }catch(e){} f.n=(f.n||0)+1; if(f.n>=5){ f.until=Date.now()+30000; f.n=0; } lsSet(LS_FAILS,JSON.stringify(f)); }
 function ensureLoginEl(){
   var el=document.getElementById('noon-login'); if(el) return el;
   el=document.createElement('div'); el.id='noon-login';
   el.innerHTML='<form id="noon-login-form" autocomplete="on"><h1>تسجيل الدخول</h1><p class="sub" id="noon-login-msg"></p>'+
-    '<label>البريد الإلكتروني<input id="nl-email" type="email" autocomplete="username" dir="ltr" required></label>'+
-    '<label>كلمة المرور<input id="nl-pass" type="password" autocomplete="current-password" dir="ltr" required></label>'+
-    '<label>اسم هذا الجهاز <small>(اختياري، بالإنجليزية، مثال: Reception-PC)</small><input id="nl-dev" type="text" dir="ltr" maxlength="40"></label>'+
+    (ACCOUNTS.length?'':'<label>البريد الإلكتروني<input id="nl-email" type="email" autocomplete="username" dir="ltr" required></label>')+
+    '<label>كلمة المرور<input id="nl-pass" type="password" autocomplete="'+(ACCOUNTS.length?'off':'current-password')+'" dir="ltr" required></label>'+
     '<button class="btn primary" type="submit" id="nl-go">دخول</button></form>';
   document.body.appendChild(el);
-  el.querySelector('#nl-dev').value=deviceName();
   el.querySelector('form').addEventListener('submit',async function(ev){
     ev.preventDefault();
     var btn=el.querySelector('#nl-go'), msg=el.querySelector('#noon-login-msg');
-    lsSet(LS_DEVICE,el.querySelector('#nl-dev').value.replace(/[^A-Za-z0-9 _.\-]/g,'').trim());
     btn.disabled=true; btn.textContent='جارٍ الدخول…'; msg.textContent=''; msg.className='sub';
     try{
-      var r=await http('POST','/auth/v1/token?grant_type=password',{noAuth:true,body:{email:el.querySelector('#nl-email').value.trim(),password:el.querySelector('#nl-pass').value}});
+      var wait=lockLeft(); if(wait>0){ throw mkErr('locked','محاولات خاطئة كثيرة. انتظر '+wait+' ثانية ثم أعد المحاولة.'); }
+      var pw=el.querySelector('#nl-pass').value, r=null, emails;
+      if(ACCOUNTS.length){ var last=lsGet(LS_LAST); emails=ACCOUNTS.slice().sort(function(a,b){ return (b===last)-(a===last); }); }
+      else emails=[el.querySelector('#nl-email').value.trim()];
+      var lastErr=null;
+      for(var i=0;i<emails.length&&!r;i++){
+        try{ r=await http('POST','/auth/v1/token?grant_type=password',{noAuth:true,body:{email:emails[i],password:pw}}); lsSet(LS_LAST,emails[i]); }
+        catch(e1){ lastErr=e1; if(e1.code!=='invalid_credentials'&&!(e1.status===400&&/invalid/i.test(e1.message||''))) throw e1; }
+      }
+      if(!r){ noteFail(); throw lastErr; }
+      lsSet(LS_FAILS,null);
       saveSession(toSession(r.data)); await loadProfile();
       el.hidden=true; el.querySelector('#nl-pass').value='';
       if(loginResolve){ var f=loginResolve; loginResolve=null; f(); }
     }catch(e){
       saveSession(null);
       msg.className='sub bad';
-      msg.textContent=e.code==='not_member'?e.message:(e.code==='network'?e.message:(e.status===400||e.status===401||e.status===422?'البريد أو كلمة المرور غير صحيحة.':'تعذر الدخول: '+e.message));
+      var why={invalid_credentials:ACCOUNTS.length?'كلمة المرور غير صحيحة.':'البريد أو كلمة المرور غير صحيحة.',email_not_confirmed:'هذا الحساب غير مؤكَّد في Supabase. فعّل Auto Confirm للمستخدم أو أكّد بريده من لوحة Users.',user_banned:'هذا الحساب موقوف.',over_request_rate_limit:'محاولات كثيرة. انتظر دقيقة ثم أعد المحاولة.',over_email_send_rate_limit:'محاولات كثيرة. انتظر دقيقة ثم أعد المحاولة.',validation_failed:'أدخل كلمة المرور.'};
+      msg.textContent=(e.code==='not_member'||e.code==='locked')?e.message:(e.code==='network'?e.message+' (تحقق أيضاً من صحة عنوان المشروع في الملف)':(why[e.code]||('تعذر الدخول ['+(e.status||'')+' '+(e.code||'')+']: '+e.message)));
     }finally{ btn.disabled=false; btn.textContent='دخول'; }
   });
   return el;
@@ -272,7 +286,7 @@ function ensureLoginEl(){
 function showLogin(message){
   var el=ensureLoginEl(); el.hidden=false;
   if(message){ var m=el.querySelector('#noon-login-msg'); m.textContent=message; m.className='sub'; }
-  setTimeout(function(){ var i=el.querySelector('#nl-email'); if(i) i.focus(); },50);
+  setTimeout(function(){ var i=el.querySelector('#nl-email')||el.querySelector('#nl-pass'); if(i) i.focus(); },50);
 }
 function requireLogin(){
   return new Promise(async function(resolve){
