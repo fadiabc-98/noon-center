@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#0D2E2D"><link rel="manifest" href="manifest.json"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="مركز نون">
 <style>html,body{margin:0}[hidden]{display:none!important}</style>
 <script>
 /* Local storage shim: same db/downloads API the page uses, backed by IndexedDB in this browser. */
@@ -710,6 +711,8 @@ function periodOf(sd,ref){
   return {start:s,end:e,next:ns};
 }
 function prevPeriod(sd,p){ var d=new Date(Date.UTC(+p.start.slice(0,4),+p.start.slice(5,7)-1,+p.start.slice(8,10))-86400000).toISOString().slice(0,10); return periodOf(sd,d); }
+/* cache.payments holds raw rows: student_id, paid_on, amount, note, created_at */
+function pays(){ return (cache.payments||[]).map(function(p){ return {studentId:p.student_id,date:p.paid_on,amount:Number(p.amount)||0,note:p.note,at:Date.parse(p.created_at)||0}; }); }
 function salaryAt(list,empId,date){ var best=null; list.forEach(function(s){ if(s.employee_id===empId&&s.from_date<=date&&(!best||s.from_date>best.from_date)) best=s; }); return best; }
 function modalShell(title,wide){
   var ov=document.createElement('div'); ov.className='noon-modal'+(wide?' wide':'');
@@ -806,17 +809,17 @@ function openMoney(){
     return {sal:s,adv:adv,advSum:advSum,remaining:s==null?null:s-advSum,paid:paid};
   }
   function render(){
-    var head='<div class="tabs"><button type="button" data-t="sum"'+(tab==='sum'?' class="on"':'')+'>ملخص الشهر</button><button type="button" data-t="exp"'+(tab==='exp'?' class="on"':'')+'>المصروفات</button><button type="button" data-t="emp"'+(tab==='emp'?' class="on"':'')+'>الموظفون والرواتب</button></div><div id="mn-msg" class="sub '+msgCls+'">'+esc(msg)+'</div>';
+    var head='<div class="tabs"><button type="button" data-t="sum"'+(tab==='sum'?' class="on"':'')+'>ملخص الشهر</button><button type="button" data-t="day"'+(tab==='day'?' class="on"':'')+'>الدخل اليومي</button><button type="button" data-t="exp"'+(tab==='exp'?' class="on"':'')+'>المصروفات</button><button type="button" data-t="emp"'+(tab==='emp'?' class="on"':'')+'>الموظفون والرواتب</button></div><div id="mn-msg" class="sub '+msgCls+'">'+esc(msg)+'</div>';
     bd.innerHTML=head+'<div id="mn-body"></div>';
     bd.querySelectorAll('.tabs button').forEach(function(b){ b.onclick=function(){ tab=b.dataset.t; msg=''; render(); }; });
     var body=bd.querySelector('#mn-body');
-    if(tab==='sum') renderSum(body); else if(tab==='exp') renderExp(body); else renderEmp(body);
+    if(tab==='sum') renderSum(body); else if(tab==='day') renderDay(body); else if(tab==='exp') renderExp(body); else renderEmp(body);
   }
   function monthPicker(){ return '<label class="mp">الشهر <input type="month" id="mn-month" value="'+esc(month)+'"></label>'; }
   function bindMonth(body){ body.querySelector('#mn-month').onchange=function(){ if(this.value){ month=this.value; render(); } }; }
   function renderSum(body){
     var r=monthRange(month), c=cur();
-    var coll=sum((cache.payments||[]).filter(function(p){ return p.date&&inRange(p.date,r[0],r[1]); }),function(p){return p.amount;});
+    var coll=sum(pays().filter(function(p){ return p.date&&inRange(p.date,r[0],r[1]); }),function(p){return p.amount;});
     var ex=D.expenses.filter(function(x){ return inRange(x.on_date,r[0],r[1]); }), exSum=sum(ex,function(x){return x.amount;});
     var adv=sum(D.advances.filter(function(x){ return inRange(x.on_date,r[0],r[1]); }),function(x){return x.amount;});
     var sp=sum(D.pays.filter(function(x){ return inRange(x.paid_on,r[0],r[1]); }),function(x){return x.amount;});
@@ -830,6 +833,25 @@ function openMoney(){
       '<div class="card big"><span class="l">الصافي</span><b class="'+(net<0?'bad':'t-ok')+'">'+n2(net)+' <small>'+esc(c)+'</small></b></div></div>'+
       '<p class="sub">الحساب نقدي: كل مبلغ يُحسب في تاريخ دفعه فعلاً. الصافي = المحصّل − المصروفات − السلف − الرواتب المدفوعة.</p>'+
       (Object.keys(cats).length?'<h3 class="sec">المصروفات حسب التصنيف</h3><table class="imp"><tbody>'+Object.keys(cats).sort(function(a,b){return cats[b]-cats[a];}).map(function(k){ return '<tr><td>'+esc(k)+'</td><td class="n" dir="ltr">'+n2(cats[k])+'</td></tr>'; }).join('')+'</tbody></table>':'');
+    bindMonth(body);
+  }
+  function renderDay(body){
+    var r=monthRange(month), c=cur(), days={};
+    function d(k){ return days[k]||(days[k]={pays:[],out:0}); }
+    pays().forEach(function(p){ if(p.date&&inRange(p.date,r[0],r[1])) d(p.date).pays.push(p); });
+    D.expenses.forEach(function(x){ if(inRange(x.on_date,r[0],r[1])) d(x.on_date).out+=Number(x.amount); });
+    D.advances.forEach(function(x){ if(inRange(x.on_date,r[0],r[1])) d(x.on_date).out+=Number(x.amount); });
+    D.pays.forEach(function(x){ if(inRange(x.paid_on,r[0],r[1])) d(x.paid_on).out+=Number(x.amount); });
+    var keys=Object.keys(days).sort().reverse(), tIn=0, tOut=0, cnt=0;
+    var rows=keys.map(function(k){ var x=days[k], inn=sum(x.pays,function(p){return p.amount;}); tIn+=inn; tOut+=x.out; cnt+=x.pays.length; var net=inn-x.out;
+      var det=x.pays.slice().sort(function(a,b){return (a.at||0)-(b.at||0);}).map(function(p){ return '<li>'+esc(studentName(p.studentId)||'(طالب محذوف)')+' — <b>'+n2(p.amount)+'</b>'+(p.note?' <small>('+esc(p.note)+')</small>':'')+'</li>'; }).join('');
+      return '<tr class="dy"><td dir="ltr">'+esc(k)+'</td><td class="n">'+x.pays.length+'</td><td class="n t-ok">'+n2(inn)+'</td><td class="n">'+n2(x.out)+'</td><td class="n '+(net<0?'bad':'')+'">'+n2(net)+'</td></tr>'+(det?'<tr class="dd"><td colspan="5"><details><summary>تفاصيل الدفعات</summary><ul>'+det+'</ul></details></td></tr>':''); }).join('');
+    var t=today(), todayIn=sum(days[t]?days[t].pays:[],function(p){return p.amount;});
+    body.innerHTML=monthPicker()+'<div class="cards"><div class="card"><span class="l">دخل اليوم ('+esc(t)+')</span><b class="t-ok">'+n2(todayIn)+' <small>'+esc(c)+'</small></b></div>'+
+      '<div class="card"><span class="l">إجمالي الدخل في الشهر</span><b class="t-ok">'+n2(tIn)+' <small>'+esc(c)+'</small></b></div>'+
+      '<div class="card"><span class="l">عدد الدفعات</span><b>'+cnt+'</b></div>'+
+      '<div class="card"><span class="l">متوسط يوم العمل</span><b>'+n2(keys.filter(function(k){return days[k].pays.length;}).length?tIn/keys.filter(function(k){return days[k].pays.length;}).length:0)+' <small>'+esc(c)+'</small></b></div></div>'+
+      '<table class="imp"><thead><tr><th>اليوم</th><th>الدفعات</th><th>الدخل</th><th>خرج (مصروفات وسلف ورواتب)</th><th>الصافي</th></tr></thead><tbody>'+(rows||'<tr><td colspan="5" class="empty">لا حركة في هذا الشهر.</td></tr>')+'</tbody>'+(keys.length?'<tfoot><tr><td>الإجمالي</td><td class="n">'+cnt+'</td><td class="n">'+n2(tIn)+'</td><td class="n">'+n2(tOut)+'</td><td class="n">'+n2(tIn-tOut)+'</td></tr></tfoot>':'')+'</table>';
     bindMonth(body);
   }
   function renderExp(body){
@@ -975,7 +997,7 @@ function injectUi(){
   '.b{font-weight:700;padding:2px 8px;border-radius:999px;background:var(--mute-bg);text-align:center}.op-INSERT{background:var(--ok-bg);color:var(--ok)}.op-DELETE{background:var(--crit-bg);color:var(--crit)}.op-UPDATE{background:var(--warn-bg);color:var(--warn)}'+
   '.dt{padding:8px 10px;background:var(--surface2);border-radius:8px;margin-top:6px}.chg{display:flex;gap:10px;align-items:baseline;padding:2px 0}.chg .f{min-width:110px;font-weight:700}.chg .o{color:var(--crit);text-decoration:line-through}.chg .n{color:var(--ok)}pre.raw{white-space:pre-wrap;margin:0;font-size:12px;direction:ltr;text-align:left}'+
   '.empty{color:var(--muted);padding:16px;text-align:center}'+
-  '.tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}.tabs button{border:1px solid var(--line);background:var(--surface2);color:var(--fg);border-radius:999px;padding:6px 14px;font:600 13px var(--font);cursor:pointer}.tabs button.on{background:var(--primary,var(--fg));color:var(--surface);border-color:transparent}'+
+  'details.lg{}.dd td{padding:0 8px 6px!important;border:0!important}.dd ul{margin:4px 0;padding-inline-start:22px}.tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}.tabs button{border:1px solid var(--line);background:var(--surface2);color:var(--fg);border-radius:999px;padding:6px 14px;font:600 13px var(--font);cursor:pointer}.tabs button.on{background:var(--primary,var(--fg));color:var(--surface);border-color:transparent}'+
   '.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:10px 0}.cards.sm{margin:8px 0}.noon-modal .card{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface2);display:flex;flex-direction:column;gap:4px}.noon-modal .card .l{font-size:12px;color:var(--muted)}.noon-modal .card b{font-size:18px}.noon-modal .card.big{border-width:2px}.noon-modal .card.emp{margin-bottom:12px;background:var(--surface)}.noon-modal .card.off{opacity:.65}'+
   '.eh{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;justify-content:space-between}.advs{margin:4px 0;padding-inline-start:20px;font-size:13px}.row.wrap{flex-wrap:wrap}.t-ok{color:var(--ok)}'+
   '.frm label.grow{flex:1;min-width:200px}.frm input,.frm select{width:100%;box-sizing:border-box}.frm label{min-width:130px}.noon-modal h3.sec{margin:18px 0 6px;font-size:15px}.noon-modal .steps{padding-inline-start:20px}.pwbox{border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:10px;background:var(--surface2)}.mp{display:inline-flex;gap:8px;align-items:center;font-weight:600;margin-bottom:8px}td.n{text-align:left}'+
