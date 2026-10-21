@@ -418,12 +418,7 @@ async function loadSessions(){
     if(sig!==smSig){ smSig=sig; if(window.NOON_REDRAW) window.NOON_REDRAW(); }
   }catch(e){}
 }
-window.NOON_API={uploadReceipt:async function(bytes){
-  var a=new Uint8Array(16); crypto.getRandomValues(a); var nm=Array.prototype.map.call(a,function(x){ return ('0'+x.toString(16)).slice(-2); }).join('')+'.pdf';
-  var res=await fetch(BASE+'/storage/v1/object/receipts/'+nm,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+(await freshToken()),'Content-Type':'application/pdf','x-upsert':'false'},body:bytes});
-  if(!res.ok) throw mkErr('upload','تعذر رفع الإيصال ('+res.status+')');
-  return BASE+'/storage/v1/object/public/receipts/'+nm;
-},isClosed:async function(day){ try{ var r=await http('GET','/rest/v1/cash_closings?select=day&day=eq.'+encodeURIComponent(day)); return Array.isArray(r.data)&&r.data.length>0; }catch(e){ return false; } },http:function(a,b,c){return http(a,b,c);},guarded:function(w,n,f){return guarded(w,n,f);},reloadSessions:loadSessions,addDays:addDays};
+window.NOON_API={isClosed:async function(day){ try{ var r=await http('GET','/rest/v1/cash_closings?select=day&day=eq.'+encodeURIComponent(day)); return Array.isArray(r.data)&&r.data.length>0; }catch(e){ return false; } },http:function(a,b,c){return http(a,b,c);},guarded:function(w,n,f){return guarded(w,n,f);},reloadSessions:loadSessions,addDays:addDays};
 
 /* ---------- sync (periodic check + immediate refresh after own writes) ---------- */
 async function readMarker(){ var r=await http('POST','/rest/v1/rpc/change_marker',{body:{}}); return r.data; }
@@ -4132,27 +4127,23 @@ function receiptWaText(m){
   L.push('إجمالي الرسوم: '+money(m.fee)+' '+m.cur,'المدفوع: '+money(m.paid)+' '+m.cur,rem>0?'المتبقي: '+money(rem)+' '+m.cur:(rem<0?'الرصيد: زيادة '+money(-rem)+' '+m.cur:'الحساب مسدّد بالكامل ✅'),'','شكراً لكم.');
   return L.join('\n');
 }
-async function receiptPdfBytes(){
-  var cv=await renderReceipt(); if(!cv) return null; var m=RC.model;
-  var blob=await new Promise(function(res){ cv.toBlob(res,'image/jpeg',0.9); }); if(!blob) return null;
-  var jpeg=new Uint8Array(await blob.arrayBuffer());
-  return {pdf:buildPdf(jpeg,cv.width,cv.height,'إيصال '+m.no+' - '+m.name),model:m};
-}
 async function sendReceiptWa(){
   var r=S.rc&&D.byId[S.rc.sid]; if(!r) return;
-  var p=waPhone(r); if(!p){ toast('لا يوجد رقم هاتف لهذا الطالب'); return; }
-  var btn=document.getElementById('rcpt-wa'); if(btn){ btn.disabled=true; btn.textContent='جارٍ تجهيز ملف PDF…'; }
-  var text, link='';
+  var cv=await renderReceipt(); if(!cv) return; var m=RC.model, text=receiptWaText(m);
+  var blob=await new Promise(function(res){ cv.toBlob(res,'image/png'); });
+  // phones: the share sheet with the image attached (pick WhatsApp, then the contact)
   try{
-    var o=await receiptPdfBytes(); if(!o) return;
-    text=receiptWaText(o.model);
-    try{ link=await window.NOON_API.uploadReceipt(o.pdf); }catch(e){ toast('تعذر رفع ملف PDF، سيُرسَل نص الإيصال فقط'); }
-  }catch(e){ toast('تعذر تجهيز الإيصال'); return; }
-  finally{ if(btn){ btn.disabled=false; btn.textContent='إرسال PDF إلى واتساب ولي الأمر'; } }
-  if(link) text+='\n\nملف الإيصال (PDF):\n'+link;
+    var f=blob&&new File([blob],'إيصال-'+m.no+'.png',{type:'image/png'});
+    if(f&&navigator.canShare&&navigator.share&&navigator.canShare({files:[f]})){ await navigator.share({files:[f],text:text}); return; }
+  }catch(e){ if(e&&e.name==='AbortError') return; }
+  // computer: copy the image, open the guardian's chat, the user pastes it
+  var p=waPhone(r), copied=false;
+  try{ if(blob&&navigator.clipboard&&window.ClipboardItem){ await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); copied=true; } }catch(e){}
+  if(!p){ toast(copied?'نُسخت صورة الإيصال. لا يوجد رقم هاتف للطالب، افتح المحادثة والصق الصورة':'لا يوجد رقم هاتف لهذا الطالب'); return; }
+  toast(copied?'نُسخت صورة الإيصال، الصقها في المحادثة (Ctrl+V)':'تعذر نسخ الصورة، استخدم زر تنزيل PDF');
   window.open('https://wa.me/'+p+'?text='+encodeURIComponent(text),'_blank','noopener');
 }
-(function(){ var row=document.querySelector('#rcpt .row:last-of-type'); if(row&&!document.getElementById('rcpt-wa')){ var b=document.createElement('button'); b.type='button'; b.className='btn wa'; b.id='rcpt-wa'; b.dataset.xact='rcpt-wa'; b.textContent='إرسال PDF إلى واتساب ولي الأمر'; row.insertBefore(b,row.firstChild); } })();
+(function(){ var row=document.querySelector('#rcpt .row:last-of-type'); if(row&&!document.getElementById('rcpt-wa')){ var b=document.createElement('button'); b.type='button'; b.className='btn wa'; b.id='rcpt-wa'; b.dataset.xact='rcpt-wa'; b.textContent='مشاركة الصورة على واتساب'; row.insertBefore(b,row.firstChild); } })();
 document.addEventListener('click',function(e){
   var el=e.target.closest&&e.target.closest('[data-xact],[data-xtab]'); if(!el) return;
   var t=el.dataset.xtab;
