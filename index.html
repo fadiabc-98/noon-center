@@ -336,11 +336,11 @@ var MAP={
     row:function(d,full){ var o={}; if(full||'name' in d) o.name=d.name; if(full||'phone' in d) o.phone=d.phone||''; if(full||'guardian' in d) o.guardian=d.guardian||'';
       if(full||'guardianPhone' in d) o.guardian_phone=d.guardianPhone||''; if(full||'notes' in d) o.notes=d.notes||''; if(full||'joined' in d) o.joined=d.joined||null; if(full||'status' in d) o.status=d.status||'active'; return o; }},
   subs:{path:'subscriptions',order:'created_at.asc,id.asc',
-    doc:function(r){ var o={studentId:r.student_id,course:r.course,start:r.start_date,end:r.end_date,months:r.months,fee:Number(r.fee),at:Date.parse(r.created_at)||0}; if(r.kind==='session') o.kind='session'; if(Number(r.discount)>0){ o.discount=Number(r.discount); o.discountPct=r.discount_pct==null?null:Number(r.discount_pct); o.discountReason=r.discount_reason||''; o.discountBy=r.discount_by||''; } if(r.teacher_id) o.teacherId=r.teacher_id; return o; },
+    doc:function(r){ var o={studentId:r.student_id,course:r.course,start:r.start_date,end:r.end_date,months:r.months,fee:Number(r.fee),at:Date.parse(r.created_at)||0}; if(r.kind==='session') o.kind='session'; if(Number(r.discount)>0){ o.discount=Number(r.discount); o.discountPct=r.discount_pct==null?null:Number(r.discount_pct); o.discountReason=r.discount_reason||''; o.discountBy=r.discount_by||''; } if(r.teacher_id) o.teacherId=r.teacher_id; if(r.subjects) o.subjects=r.subjects; return o; },
     row:function(d,full){ var o={}; if(full||'studentId' in d) o.student_id=d.studentId; if(full||'course' in d) o.course=d.course; if(full||'start' in d) o.start_date=d.start;
       if(full||'end' in d) o.end_date=d.end; if(full||'months' in d) o.months=d.months; if(full||'fee' in d) o.fee=d.fee; if(full||'kind' in d) o.kind=d.kind==='session'?'session':'month';
       if(full||'discount' in d){ o.discount=Number(d.discount)||0; o.discount_pct=d.discountPct||null; o.discount_reason=d.discountReason||''; }
-      if(full||'teacherId' in d) o.teacher_id=d.teacherId||null; return o; }},
+      if(full||'teacherId' in d) o.teacher_id=d.teacherId||null; if(full||'subjects' in d) o.subjects=String(d.subjects||'').slice(0,200); return o; }},
   payments:{path:'payments',order:'created_at.asc,id.asc',
     doc:function(r){ return {studentId:r.student_id,subId:r.sub_id,amount:Number(r.amount),date:r.paid_on,note:r.note,method:r.method||'cash',at:Date.parse(r.created_at)||0}; },
     row:function(d,full){ var o={}; if(full||'studentId' in d) o.student_id=d.studentId; if(full||'subId' in d) o.sub_id=d.subId; if(full||'amount' in d) o.amount=d.amount;
@@ -637,7 +637,7 @@ function openImport(source,label){
 /* ---------- activity log page ---------- */
 var OPS={INSERT:'إضافة',UPDATE:'تعديل',DELETE:'حذف',EXPORT:'تصدير',IMPORT:'استيراد',RESTORE:'استعادة',LOGIN:'دخول',LOGOUT:'خروج',ADMIN:'إجراء إداري'};
 var SECS={students:'الطلاب',subscriptions:'الاشتراكات',payments:'الدفعات',attendance:'الحضور',settings:'الإعدادات',system:'النظام',accounts:'الحسابات',expenses:'المصروفات',employees:'الموظفون',employee_salaries:'رواتب الموظفين',advances:'السلف',salary_payments:'دفع الرواتب',teachers:'المعلمون',teacher_terms:'أجور المعلمين',teacher_payments:'دفعات المعلمين',inquiries:'الاستفسارات',cash_closings:'إقفال الصندوق',trash:'سلة المحذوفات'};
-var FIELDS={name:'الاسم',phone:'الهاتف',guardian:'ولي الأمر',guardian_phone:'هاتف ولي الأمر',notes:'ملاحظات',joined:'تاريخ الانضمام',course:'الدورة',start_date:'البداية',end_date:'النهاية',months:'الأشهر',fee:'الرسوم',kind:'النوع',amount:'المبلغ',paid_on:'تاريخ الدفع',note:'ملاحظة',mark:'العلامة',day:'اليوم',data:'الإعدادات',student_id:'الطالب',sub_id:'الاشتراك',category:'التصنيف',description:'البيان',on_date:'التاريخ',employee_id:'الموظف',period_start:'بداية الفترة',start_day:'يوم بداية الشهر',active:'يعمل',from_date:'يسري من',email:'البريد',role:'الصلاحية',status:'الحالة',method:'طريقة الدفع',discount:'الخصم',discount_pct:'نسبة الخصم',discount_reason:'سبب الخصم',discount_by:'بواسطة',teacher_id:'المعلم',pay_type:'نوع الأجر',rate:'القيمة',interest:'الاهتمام',follow_up:'موعد المتابعة',created_by:'سجّله'};
+var FIELDS={name:'الاسم',phone:'الهاتف',guardian:'ولي الأمر',guardian_phone:'هاتف ولي الأمر',notes:'ملاحظات',joined:'تاريخ الانضمام',course:'الدورة',start_date:'البداية',end_date:'النهاية',months:'الأشهر',fee:'الرسوم',kind:'النوع',amount:'المبلغ',paid_on:'تاريخ الدفع',note:'ملاحظة',mark:'العلامة',day:'اليوم',data:'الإعدادات',student_id:'الطالب',sub_id:'الاشتراك',category:'التصنيف',description:'البيان',on_date:'التاريخ',employee_id:'الموظف',period_start:'بداية الفترة',start_day:'يوم بداية الشهر',active:'يعمل',from_date:'يسري من',email:'البريد',role:'الصلاحية',status:'الحالة',method:'طريقة الدفع',discount:'الخصم',discount_pct:'نسبة الخصم',discount_reason:'سبب الخصم',discount_by:'بواسطة',subjects:'المواد',teacher_id:'المعلم',pay_type:'نوع الأجر',rate:'القيمة',interest:'الاهتمام',follow_up:'موعد المتابعة',created_by:'سجّله'};
 function studentName(id){ var s=cache.students.filter(function(x){return x.id===id;})[0]; return s?s.name:null; }
 function fieldVal(k,v){
   if(v==null||v==='') return '—';
@@ -2345,6 +2345,7 @@ function subFieldsHtml(pre,o){
       '<label class="seg-o"><input type="radio" name="'+pre+'-kind" data-f="kind" value="month"'+(ses?'':' checked')+'><span>اشتراك شهري</span></label>'+
       '<label class="seg-o"><input type="radio" name="'+pre+'-kind" data-f="kind" value="session"'+(ses?' checked':'')+'><span>حصة واحدة فقط</span></label></div></div>'+
     '<div class="field wide"><label for="'+pre+'-course">الدورة</label><input id="'+pre+'-course" data-f="course" list="courses-list" autocomplete="off" value="'+esc(o.course||'')+'"></div>'+
+    '<div class="field wide"><label for="'+pre+'-subjects">المواد أو تفاصيل الدورة (اختياري، تظهر في الإيصال)</label><input id="'+pre+'-subjects" data-f="subjects" maxlength="100" autocomplete="off" placeholder="مثال: رياضيات + فيزياء" value="'+esc(o.subjects||'')+'"></div>'+
     '<div class="field"><label for="'+pre+'-start" data-lbl="start">'+(ses?'تاريخ الحصة':'تاريخ البداية')+'</label><input id="'+pre+'-start" data-f="start" class="ltr dateinput" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off" value="'+esc(fmtDate(o.start||''))+'"></div>'+
     '<div class="field monthly-only"><label for="'+pre+'-months">المدة (بالأشهر)</label><input id="'+pre+'-months" data-f="months" type="text" inputmode="numeric" maxlength="2" class="ltr" value="'+esc(o.months||1)+'"></div>'+
     '<div class="field monthly-only"><label for="'+pre+'-end">تاريخ الانتهاء</label><input id="'+pre+'-end" data-f="end" class="ltr dateinput" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off" value="'+esc(fmtDate(o.end||''))+'"></div>'+
@@ -2390,7 +2391,7 @@ function readSubFields(box,required){
   if(isNaN(paid)) return {error:'المبلغ المدفوع غير صحيح.'};
   if(paid>net) return {error:'المدفوع ('+money(paid)+') أكبر من الرسوم بعد الخصم ('+money(net)+').'};
   var tEl=box.querySelector('[data-f="teacher"]');
-  return {kind:session?'session':'month',course:course,start:start,months:months,end:end,fee:net,paid:paid,discount:disc,discountPct:dpct,discountReason:disc>0?dreason:'',method:g('method')==='transfer'?'transfer':'cash',teacherId:tEl&&tEl.value?tEl.value:''};
+  return {subjects:g('subjects'),kind:session?'session':'month',course:course,start:start,months:months,end:end,fee:net,paid:paid,discount:disc,discountPct:dpct,discountReason:disc>0?dreason:'',method:g('method')==='transfer'?'transfer':'cash',teacherId:tEl&&tEl.value?tEl.value:''};
 }
 function autoFee(box){
   if(!box) return;
@@ -2403,7 +2404,7 @@ function autoFee(box){
 }
 async function writeSub(studentId,v){
   var ref=S.db.collection('subs').doc();
-  await ref.set(Object.assign({studentId:studentId,course:v.course,start:v.start,months:v.months,end:v.end,fee:v.fee,at:Date.now()},v.kind==='session'?{kind:'session'}:{},v.discount>0?{discount:v.discount,discountPct:v.discountPct,discountReason:v.discountReason}:{},v.teacherId?{teacherId:v.teacherId}:{}));
+  await ref.set(Object.assign({studentId:studentId,course:v.course,start:v.start,months:v.months,end:v.end,fee:v.fee,at:Date.now()},v.kind==='session'?{kind:'session'}:{},v.discount>0?{discount:v.discount,discountPct:v.discountPct,discountReason:v.discountReason}:{},v.subjects?{subjects:v.subjects}:{},v.teacherId?{teacherId:v.teacherId}:{}));
   if(v.paid>0){
     await S.db.collection('payments').doc().set({studentId:studentId,subId:ref.id,amount:v.paid,date:todayStr(),note:'دفعة عند الاشتراك',method:v.method==='transfer'?'transfer':'cash',at:Date.now()});
   }
@@ -2527,7 +2528,7 @@ function renderDetail(){
 
   $('#d-subs').innerHTML=r.subs.length?r.subs.map(function(s){
     var ss=subState(s,today), sess=s.kind==='session', pill=sess?'<span class="pill info">حصة منفردة</span>':ss==='active'?'<span class="pill ok">ساري</span>':ss==='upcoming'?'<span class="pill info">لم يبدأ</span>':'<span class="pill mute">منتهي</span>';
-    return '<div class="item"><div class="i-main"><b>'+esc(s.course)+'</b><div class="sub">'+(sess?'حصة بتاريخ '+fmtDate(s.start):'من '+fmtDate(s.start)+' إلى '+fmtDate(s.end)+' · '+esc(s.months||'')+' شهر')+(teacherName(s.teacherId)?' · '+esc(teacherName(s.teacherId)):'')+'</div>'+(s.discount>0?'<div class="sub t-ok">خصم '+esc(money(s.discount))+(s.discountPct?' ('+esc(s.discountPct)+'%)':'')+' — '+esc(s.discountReason||'')+(s.discountBy?' · '+esc(s.discountBy):'')+'</div>':'')+'</div>'+
+    return '<div class="item"><div class="i-main"><b>'+esc(s.course)+'</b><div class="sub">'+(sess?'حصة بتاريخ '+fmtDate(s.start):'من '+fmtDate(s.start)+' إلى '+fmtDate(s.end)+' · '+esc(s.months||'')+' شهر')+(teacherName(s.teacherId)?' · '+esc(teacherName(s.teacherId)):'')+'</div>'+(s.subjects?'<div class="sub">المواد: '+esc(s.subjects)+'</div>':'')+(s.discount>0?'<div class="sub t-ok">خصم '+esc(money(s.discount))+(s.discountPct?' ('+esc(s.discountPct)+'%)':'')+' — '+esc(s.discountReason||'')+(s.discountBy?' · '+esc(s.discountBy):'')+'</div>':'')+'</div>'+
       '<div class="i-nums"><span>الرسوم '+esc(money(s.fee))+'</span><span>المدفوع '+esc(money(s.paid))+'</span><span class="'+(s.remaining>0?'t-crit':'')+'">المتبقي '+esc(money(s.remaining))+'</span></div>'+
       '<div class="i-act">'+pill+'<button class="btn sm" type="button" data-act="receipt" data-sub="'+esc(s.id)+'">إيصال</button>'+(s.remaining>0?'<button class="btn sm" type="button" data-act="panel" data-panel="pay" data-sub="'+esc(s.id)+'">دفعة</button>':'')+
       '<button class="btn sm danger" type="button" data-act="del-sub" data-id="'+esc(s.id)+'">حذف</button></div></div>';
@@ -2568,7 +2569,7 @@ function showPanel(name,subId,kind){
     var lastEnd=monthly.reduce(function(m,s){return s.end>m?s.end:m;},'');
     var start=ses?today:(lastEnd&&lastEnd>=today?addDays(lastEnd,1):today);
     var mo=last?(last.months||1):1;
-    $('#rn-box').innerHTML=subFieldsHtml('rn',{kind:ses?'session':'month',course:last?last.course:'',start:start,months:mo,end:subEnd(start,mo),fee:(!ses&&last)?r3((Number(last.fee)||0)+(Number(last.discount)||0)):'',teacher:last?last.teacherId:''});
+    $('#rn-box').innerHTML=subFieldsHtml('rn',{kind:ses?'session':'month',course:last?last.course:'',start:start,months:mo,end:subEnd(start,mo),fee:(!ses&&last)?r3((Number(last.fee)||0)+(Number(last.discount)||0)):'',teacher:last?last.teacherId:'',subjects:last?(last.subjects||''):''});
     $('#rn-err').textContent='';
     if(last&&!ses) $('#rn-box [data-f="fee"]').dataset.touched='1';
     if(ses) autoFee($('#rn-box .subfields'));
@@ -3120,10 +3121,10 @@ function receiptModel(){
   var r=D.byId[S.rc.sid]; if(!r) return null;
   var s=r.subs.filter(function(x){ return x.id===S.rc.sub; })[0]; if(!s) return null;
   var pays=r.pays.filter(function(p){ return p.subId===s.id; }).slice().sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:((a.at||0)-(b.at||0))); });
-  return {no:receiptNo(s),center:S.settings.centerName,cur:S.settings.currency,name:r.st.name,course:s.course||'',session:s.kind==='session',start:s.start,end:s.end,months:s.months,fee:s.fee,paid:s.paid,remaining:s.remaining,pays:pays,today:todayStr(),discount:Number(s.discount)||0,discountPct:s.discountPct||0,discountReason:s.discountReason||'',discountBy:s.discountBy||''};
+  return {no:receiptNo(s),center:S.settings.centerName,cur:S.settings.currency,name:r.st.name,course:s.course||'',session:s.kind==='session',start:s.start,end:s.end,months:s.months,fee:s.fee,paid:s.paid,remaining:s.remaining,pays:pays,today:todayStr(),subjects:s.subjects||'',discount:Number(s.discount)||0,discountPct:s.discountPct||0,discountReason:s.discountReason||'',discountBy:s.discountBy||''};
 }
 function drawReceipt(m){
-  var W=RC.W, SC=RC.SC, rows=Math.max(m.pays.length,1), H=Math.max(1560,706+rows*58+440);
+  var W=RC.W, SC=RC.SC, rows=Math.max(m.pays.length,1), H=Math.max(1560,706+rows*58+440)+(m.subjects?130:0), dy=m.subjects?130:0;
   var cv=document.createElement('canvas'); cv.width=Math.round(W*SC); cv.height=Math.round(H*SC);
   var c=cv.getContext('2d'); c.scale(SC,SC); c.direction='rtl';
   c.fillStyle='#fff'; c.fillRect(0,0,W,H);
@@ -3147,6 +3148,8 @@ function drawReceipt(m){
   cell(xr2,385,colW,'نوع الاشتراك',m.session?'حصة منفردة':'اشتراك شهري ('+(m.months||1)+' شهر)');
   if(m.session){ cell(xr1,495,colW,'تاريخ الحصة',fmtDate(m.start)); }
   else { cell(xr1,495,colW,'تاريخ البدء',fmtDate(m.start)); cell(xr2,495,colW,'تاريخ الانتهاء',fmtDate(m.end)); }
+  if(m.subjects) cell(R,605,W-2*M,'المواد',m.subjects);
+  c.save(); c.translate(0,dy);
   // payments table
   T('الدفعات',R,625,30,700,INK);
   c.fillStyle='#EEF3F1'; rr(M,648,W-2*M,54,10); c.fill();
@@ -3179,6 +3182,7 @@ function drawReceipt(m){
   // signature + note
   var sy=top+200+120; c.strokeStyle=INK; c.lineWidth=2; c.beginPath(); c.moveTo(M,sy); c.lineTo(M+380,sy); c.stroke();
   T('توقيع المستلم',M+190,sy+36,24,500,MU,'center');
+  c.restore();
   T('رقم الإيصال ثابت، وتتحدّث بياناته عند تسجيل أي دفعة جديدة.',W/2,H-44,22,500,MU,'center');
   return cv;
 }
