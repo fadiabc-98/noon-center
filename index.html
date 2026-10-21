@@ -332,17 +332,19 @@ function requireLogin(){
 /* ---------- row <-> document mapping ---------- */
 var MAP={
   students:{path:'students',order:'created_at.asc,id.asc',
-    doc:function(r){ return {name:r.name,phone:r.phone,guardian:r.guardian,guardianPhone:r.guardian_phone,notes:r.notes,joined:r.joined||'',at:Date.parse(r.created_at)||0}; },
+    doc:function(r){ return {name:r.name,phone:r.phone,guardian:r.guardian,guardianPhone:r.guardian_phone,notes:r.notes,joined:r.joined||'',status:r.status||'active',at:Date.parse(r.created_at)||0}; },
     row:function(d,full){ var o={}; if(full||'name' in d) o.name=d.name; if(full||'phone' in d) o.phone=d.phone||''; if(full||'guardian' in d) o.guardian=d.guardian||'';
-      if(full||'guardianPhone' in d) o.guardian_phone=d.guardianPhone||''; if(full||'notes' in d) o.notes=d.notes||''; if(full||'joined' in d) o.joined=d.joined||null; return o; }},
+      if(full||'guardianPhone' in d) o.guardian_phone=d.guardianPhone||''; if(full||'notes' in d) o.notes=d.notes||''; if(full||'joined' in d) o.joined=d.joined||null; if(full||'status' in d) o.status=d.status||'active'; return o; }},
   subs:{path:'subscriptions',order:'created_at.asc,id.asc',
-    doc:function(r){ var o={studentId:r.student_id,course:r.course,start:r.start_date,end:r.end_date,months:r.months,fee:Number(r.fee),at:Date.parse(r.created_at)||0}; if(r.kind==='session') o.kind='session'; return o; },
+    doc:function(r){ var o={studentId:r.student_id,course:r.course,start:r.start_date,end:r.end_date,months:r.months,fee:Number(r.fee),at:Date.parse(r.created_at)||0}; if(r.kind==='session') o.kind='session'; if(Number(r.discount)>0){ o.discount=Number(r.discount); o.discountPct=r.discount_pct==null?null:Number(r.discount_pct); o.discountReason=r.discount_reason||''; o.discountBy=r.discount_by||''; } if(r.teacher_id) o.teacherId=r.teacher_id; return o; },
     row:function(d,full){ var o={}; if(full||'studentId' in d) o.student_id=d.studentId; if(full||'course' in d) o.course=d.course; if(full||'start' in d) o.start_date=d.start;
-      if(full||'end' in d) o.end_date=d.end; if(full||'months' in d) o.months=d.months; if(full||'fee' in d) o.fee=d.fee; if(full||'kind' in d) o.kind=d.kind==='session'?'session':'month'; return o; }},
+      if(full||'end' in d) o.end_date=d.end; if(full||'months' in d) o.months=d.months; if(full||'fee' in d) o.fee=d.fee; if(full||'kind' in d) o.kind=d.kind==='session'?'session':'month';
+      if(full||'discount' in d){ o.discount=Number(d.discount)||0; o.discount_pct=d.discountPct||null; o.discount_reason=d.discountReason||''; }
+      if(full||'teacherId' in d) o.teacher_id=d.teacherId||null; return o; }},
   payments:{path:'payments',order:'created_at.asc,id.asc',
-    doc:function(r){ return {studentId:r.student_id,subId:r.sub_id,amount:Number(r.amount),date:r.paid_on,note:r.note,at:Date.parse(r.created_at)||0}; },
+    doc:function(r){ return {studentId:r.student_id,subId:r.sub_id,amount:Number(r.amount),date:r.paid_on,note:r.note,method:r.method||'cash',at:Date.parse(r.created_at)||0}; },
     row:function(d,full){ var o={}; if(full||'studentId' in d) o.student_id=d.studentId; if(full||'subId' in d) o.sub_id=d.subId; if(full||'amount' in d) o.amount=d.amount;
-      if(full||'date' in d) o.paid_on=d.date; if(full||'note' in d) o.note=d.note||''; return o; }}
+      if(full||'date' in d) o.paid_on=d.date; if(full||'note' in d) o.note=d.note||''; if(full||'method' in d) o.method=d.method==='transfer'?'transfer':'cash'; return o; }}
 };
 async function fetchAll(path){
   var out=[], from=0, step=1000;
@@ -388,7 +390,11 @@ function fire(name,force){
     try{ l.cb(name==='settings'?settingsSnap():colSnap(name)); }catch(e){ if(window.console) console.error(e); }
   });
 }
+window.NOON_TEACHERS=[];
+function teacherName(id){ var t=(window.NOON_TEACHERS||[]).filter(function(x){return x.id===id;})[0]; return t?t.name:''; }
+async function loadTeachers(){ try{ var r=await http('GET','/rest/v1/teachers?select=id,name,active&order=name.asc'); window.NOON_TEACHERS=Array.isArray(r.data)?r.data:[]; }catch(e){} }
 async function refreshTables(names){
+  if(names.indexOf('subs')>=0||names===ALL) await loadTeachers();
   await Promise.all(names.map(loadTable));
   names.forEach(function(n){ loadedOnce[n]=true; fire(n); });
 }
@@ -508,7 +514,7 @@ function settingsRef(){
 function listen(name,cb,err){
   var l={name:name,cb:cb,err:err,delivered:false}; listeners.push(l);
   if(loadedOnce[name]) fire(name,true);
-  else loadTable(name).then(function(){ loadedOnce[name]=true; fire(name,true); }).catch(function(e){ if(err) err({code:e.code||'unavailable'}); });
+  else { if(name==='subs') loadTeachers(); loadTable(name).then(function(){ loadedOnce[name]=true; fire(name,true); }).catch(function(e){ if(err) err({code:e.code||'unavailable'}); }); }
   return function(){ var i=listeners.indexOf(l); if(i>=0) listeners.splice(i,1); };
 }
 function cloudCol(name){
@@ -618,8 +624,8 @@ function openImport(source,label){
 
 /* ---------- activity log page ---------- */
 var OPS={INSERT:'إضافة',UPDATE:'تعديل',DELETE:'حذف',EXPORT:'تصدير',IMPORT:'استيراد',RESTORE:'استعادة',LOGIN:'دخول',LOGOUT:'خروج',ADMIN:'إجراء إداري'};
-var SECS={students:'الطلاب',subscriptions:'الاشتراكات',payments:'الدفعات',attendance:'الحضور',settings:'الإعدادات',system:'النظام',accounts:'الحسابات',expenses:'المصروفات',employees:'الموظفون',employee_salaries:'رواتب الموظفين',advances:'السلف',salary_payments:'دفع الرواتب'};
-var FIELDS={name:'الاسم',phone:'الهاتف',guardian:'ولي الأمر',guardian_phone:'هاتف ولي الأمر',notes:'ملاحظات',joined:'تاريخ الانضمام',course:'الدورة',start_date:'البداية',end_date:'النهاية',months:'الأشهر',fee:'الرسوم',kind:'النوع',amount:'المبلغ',paid_on:'تاريخ الدفع',note:'ملاحظة',mark:'العلامة',day:'اليوم',data:'الإعدادات',student_id:'الطالب',sub_id:'الاشتراك',category:'التصنيف',description:'البيان',on_date:'التاريخ',employee_id:'الموظف',period_start:'بداية الفترة',start_day:'يوم بداية الشهر',active:'يعمل',from_date:'يسري من',email:'البريد',role:'الصلاحية'};
+var SECS={students:'الطلاب',subscriptions:'الاشتراكات',payments:'الدفعات',attendance:'الحضور',settings:'الإعدادات',system:'النظام',accounts:'الحسابات',expenses:'المصروفات',employees:'الموظفون',employee_salaries:'رواتب الموظفين',advances:'السلف',salary_payments:'دفع الرواتب',teachers:'المعلمون',teacher_terms:'أجور المعلمين',teacher_payments:'دفعات المعلمين',inquiries:'الاستفسارات',cash_closings:'إقفال الصندوق',trash:'سلة المحذوفات'};
+var FIELDS={name:'الاسم',phone:'الهاتف',guardian:'ولي الأمر',guardian_phone:'هاتف ولي الأمر',notes:'ملاحظات',joined:'تاريخ الانضمام',course:'الدورة',start_date:'البداية',end_date:'النهاية',months:'الأشهر',fee:'الرسوم',kind:'النوع',amount:'المبلغ',paid_on:'تاريخ الدفع',note:'ملاحظة',mark:'العلامة',day:'اليوم',data:'الإعدادات',student_id:'الطالب',sub_id:'الاشتراك',category:'التصنيف',description:'البيان',on_date:'التاريخ',employee_id:'الموظف',period_start:'بداية الفترة',start_day:'يوم بداية الشهر',active:'يعمل',from_date:'يسري من',email:'البريد',role:'الصلاحية',status:'الحالة',method:'طريقة الدفع',discount:'الخصم',discount_pct:'نسبة الخصم',discount_reason:'سبب الخصم',discount_by:'بواسطة',teacher_id:'المعلم',pay_type:'نوع الأجر',rate:'القيمة',interest:'الاهتمام',follow_up:'موعد المتابعة',created_by:'سجّله'};
 function studentName(id){ var s=cache.students.filter(function(x){return x.id===id;})[0]; return s?s.name:null; }
 function fieldVal(k,v){
   if(v==null||v==='') return '—';
@@ -630,6 +636,10 @@ function fieldVal(k,v){
   if(k==='employee_id') return empNames[v]||'(موظف)';
   if(k==='role') return v==='owner'?'مالك':'موظف';
   if(k==='active') return v?'نعم':'لا';
+  if(k==='status') return ({active:'نشط',paused:'موقوف مؤقتاً',withdrawn:'منسحب','new':'جديد',contacted:'تم التواصل',enrolled:'سجّل',lost:'لم يسجّل'})[v]||String(v);
+  if(k==='method') return v==='transfer'?'حوالة':'نقداً';
+  if(k==='pay_type') return v==='percent'?'نسبة مئوية':'مبلغ ثابت';
+  if(k==='teacher_id') return teacherName(v)||'(معلم)';
   return String(v);
 }
 function detailHtml(r){
@@ -649,7 +659,7 @@ function sumText(r){
 }
 function whoHtml(r){
   var v=r.new_values||r.old_values||{}, nm=null;
-  if(r.section==='students'||r.section==='employees') nm=v.name; else if(v.student_id) nm=studentName(v.student_id)||null; else if(v.employee_id&&empNames[v.employee_id]) nm=empNames[v.employee_id]; else if(v.description) nm=v.description;
+  if(r.section==='students'||r.section==='employees'||r.section==='teachers'||r.section==='inquiries') nm=v.name; else if(v.teacher_id&&teacherName(v.teacher_id)) nm=teacherName(v.teacher_id); else if(v.student_id) nm=studentName(v.student_id)||null; else if(v.employee_id&&empNames[v.employee_id]) nm=empNames[v.employee_id]; else if(v.description) nm=v.description;
   return nm?esc(nm):'';
 }
 function openLog(){
@@ -724,7 +734,7 @@ function periodOf(sd,ref){
 }
 function prevPeriod(sd,p){ var d=new Date(Date.UTC(+p.start.slice(0,4),+p.start.slice(5,7)-1,+p.start.slice(8,10))-86400000).toISOString().slice(0,10); return periodOf(sd,d); }
 /* cache.payments holds raw rows: student_id, paid_on, amount, note, created_at */
-function pays(){ return (cache.payments||[]).map(function(p){ return {studentId:p.student_id,date:p.paid_on,amount:Number(p.amount)||0,note:p.note,at:Date.parse(p.created_at)||0}; }); }
+function pays(){ return (cache.payments||[]).map(function(p){ return {studentId:p.student_id,date:p.paid_on,amount:Number(p.amount)||0,note:p.note,method:p.method||'cash',at:Date.parse(p.created_at)||0}; }); }
 function salaryAt(list,empId,date){ var best=null; list.forEach(function(s){ if(s.employee_id===empId&&s.from_date<=date&&(!best||s.from_date>best.from_date)) best=s; }); return best; }
 function fmtInputs(root){
   var AR='٠١٢٣٤٥٦٧٨٩', FA='۰۱۲۳۴۵۶۷۸۹';
@@ -805,6 +815,38 @@ function openAccounts(){
 }
 function profileId(){ return session&&session.user_id; }
 
+/* ===== inquiries (owner and receptionist) ===== */
+function openInquiries(){
+  var sh=modalShell('الاستفسارات',true), bd=sh.bd, filt='open', rows=[], msg='';
+  var ST={'new':'جديد',contacted:'تم التواصل',enrolled:'سجّل',lost:'لم يسجّل'};
+  async function load(){ try{ rows=await fetchAll('/rest/v1/inquiries?select=*&order=created_at.desc'); }catch(e){ bd.innerHTML='<div class="bad">'+esc(friendly(e).message)+'</div>'; return false; } return true; }
+  function wa(p){ var ph=String(p||'').replace(/\D/g,''); if(!ph) return ''; var cc=(typeof S!=='undefined'&&S.settings&&S.settings.countryCode)||'218'; if(ph[0]==='0') ph=cc+ph.slice(1); return ph; }
+  function render(){
+    var t=today(), list=rows.filter(function(x){ return filt==='all'||(filt==='open'?(x.status==='new'||x.status==='contacted'):x.status===filt); });
+    var due=rows.filter(function(x){ return (x.status==='new'||x.status==='contacted')&&x.follow_up&&x.follow_up<=t; }).length;
+    bd.innerHTML='<form id="iq-f" class="filters frm"><label>الاسم<input name="name" required maxlength="80"></label><label>الهاتف<input name="ph" dir="ltr" inputmode="tel" maxlength="30"></label><label>مهتم بـ<input name="int" maxlength="120" list="courses-list"></label><label>موعد المتابعة<input name="fu" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="YYYY-MM-DD" autocomplete="off" dir="ltr"></label><label class="grow">ملاحظة<input name="note" maxlength="300"></label><button class="btn sm primary" type="submit">إضافة</button></form>'+
+      '<div class="sub '+(msg?'ok':'')+'" id="iq-msg">'+esc(msg)+'</div>'+
+      '<div class="tabs">'+[['open','قيد المتابعة'],['enrolled','سجّلوا'],['lost','لم يسجّلوا'],['all','الكل']].map(function(k){ return '<button type="button" data-f="'+k[0]+'"'+(filt===k[0]?' class="on"':'')+'>'+k[1]+'</button>'; }).join('')+'</div>'+
+      (due?'<div class="sub warn">'+due+' استفسار موعد متابعته اليوم أو فات.</div>':'')+
+      '<table class="imp"><thead><tr><th>الاسم</th><th>مهتم بـ</th><th>متابعة</th><th>الحالة</th><th>ملاحظة</th><th></th></tr></thead><tbody>'+
+      (list.length?list.map(function(x){ var late=(x.status==='new'||x.status==='contacted')&&x.follow_up&&x.follow_up<=t;
+        return '<tr data-id="'+esc(x.id)+'"><td><b>'+esc(x.name)+'</b><div class="sub" dir="ltr">'+esc(x.phone)+'</div><div class="sub">'+esc(String(x.created_at).slice(0,10))+(x.created_by?' · '+esc(x.created_by):'')+'</div></td><td>'+esc(x.interest)+'</td><td dir="ltr" class="'+(late?'warn':'')+'">'+esc(x.follow_up||'—')+'</td>'+
+        '<td><select class="iq-st">'+Object.keys(ST).map(function(k){ return '<option value="'+k+'"'+(x.status===k?' selected':'')+'>'+ST[k]+'</option>'; }).join('')+'</select></td><td>'+esc(x.note)+'</td>'+
+        '<td class="nw">'+(wa(x.phone)?'<a class="btn sm" target="_blank" rel="noopener" href="https://wa.me/'+wa(x.phone)+'">واتساب</a> ':'')+'<button class="btn sm iq-rm" type="button">حذف</button></td></tr>'; }).join(''):'<tr><td colspan="6" class="empty">لا استفسارات هنا.</td></tr>')+'</tbody></table>';
+    fmtInputs(bd);
+    bd.querySelectorAll('.tabs button').forEach(function(b){ b.onclick=function(){ filt=b.dataset.f; msg=''; render(); }; });
+    var f=bd.querySelector('#iq-f'), sid=uuid();
+    f.onsubmit=async function(ev){ ev.preventDefault(); var fu=f.fu.value.trim(); if(fu&&!okDate(fu)){ bd.querySelector('#iq-msg').textContent='اكتب موعد المتابعة هكذا: 2026-10-21'; return; }
+      var btn=f.querySelector('.primary'); btn.disabled=true;
+      try{ try{ await w('POST','/rest/v1/inquiries',{id:sid,name:f.name.value.trim(),phone:f.ph.value.trim(),interest:f['int'].value.trim(),note:f.note.value.trim(),follow_up:fu||null}); }catch(er){ if(er.code!=='23505') throw er; }
+        if(await load()){ msg='تمت إضافة الاستفسار.'; render(); } }catch(e){ bd.querySelector('#iq-msg').textContent=friendly(e).message; btn.disabled=false; } };
+    bd.querySelectorAll('tr[data-id]').forEach(function(tr){ var id=tr.dataset.id;
+      tr.querySelector('.iq-st').onchange=async function(){ try{ await w('PATCH','/rest/v1/inquiries?id=eq.'+id,{status:this.value}); if(await load()){ msg='تم تحديث الحالة.'; render(); } }catch(e){ bd.querySelector('#iq-msg').textContent=friendly(e).message; } };
+      tr.querySelector('.iq-rm').onclick=async function(){ if(!confirm('حذف هذا الاستفسار؟')) return; try{ await w('DELETE','/rest/v1/inquiries?id=eq.'+id); if(await load()){ msg='تم الحذف.'; render(); } }catch(e){ bd.querySelector('#iq-msg').textContent=friendly(e).message; } }; });
+  }
+  bd.innerHTML='جارٍ التحميل…'; load().then(function(ok){ if(ok) render(); });
+}
+
 /* ===== recycle bin (owner only) ===== */
 function openTrash(){
   if(!ownerOnly()) return;
@@ -830,13 +872,15 @@ function openTrash(){
 function openMoney(){
   if(!ownerOnly()) return;
   var sh=modalShell('المصروفات والرواتب',true), bd=sh.bd;
-  var D={employees:[],salaries:[],advances:[],pays:[],expenses:[]}, tab='sum', month=today().slice(0,7), editExp=null, formId=null, msg='', msgCls='';
+  var D={employees:[],salaries:[],advances:[],pays:[],expenses:[],teachers:[],terms:[],tpays:[]}, tab='sum', month=today().slice(0,7), editExp=null, formId=null, msg='', msgCls='';
   bd.innerHTML='جارٍ التحميل…';
   async function load(){
     try{
       var r=await Promise.all([fetchAll('/rest/v1/employees?select=*&order=created_at.asc'),fetchAll('/rest/v1/employee_salaries?select=*&order=from_date.asc'),
-        fetchAll('/rest/v1/advances?select=*&order=on_date.asc,created_at.asc'),fetchAll('/rest/v1/salary_payments?select=*&order=period_start.asc'),fetchAll('/rest/v1/expenses?select=*&order=on_date.desc,created_at.desc')]);
-      D.employees=r[0]; D.salaries=r[1]; D.advances=r[2]; D.pays=r[3]; D.expenses=r[4];
+        fetchAll('/rest/v1/advances?select=*&order=on_date.asc,created_at.asc'),fetchAll('/rest/v1/salary_payments?select=*&order=period_start.asc'),fetchAll('/rest/v1/expenses?select=*&order=on_date.desc,created_at.desc'),
+        fetchAll('/rest/v1/teachers?select=*&order=created_at.asc'),fetchAll('/rest/v1/teacher_terms?select=*&order=from_date.asc'),fetchAll('/rest/v1/teacher_payments?select=*&order=paid_on.desc,created_at.desc')]);
+      D.employees=r[0]; D.salaries=r[1]; D.advances=r[2]; D.pays=r[3]; D.expenses=r[4]; D.teachers=r[5]; D.terms=r[6]; D.tpays=r[7];
+      window.NOON_TEACHERS=D.teachers.map(function(t){ return {id:t.id,name:t.name,active:t.active}; });
       D.employees.forEach(function(e){ empNames[e.id]=e.name; });
     }catch(e){ bd.innerHTML='<div class="bad">'+esc(friendly(e).message)+'</div>'; return false; }
     return true;
@@ -854,11 +898,11 @@ function openMoney(){
     return {sal:s,adv:adv,advSum:advSum,remaining:s==null?null:s-advSum,paid:paid};
   }
   function render(){
-    var head='<div class="tabs"><button type="button" data-t="sum"'+(tab==='sum'?' class="on"':'')+'>ملخص الشهر</button><button type="button" data-t="day"'+(tab==='day'?' class="on"':'')+'>الدخل اليومي</button><button type="button" data-t="exp"'+(tab==='exp'?' class="on"':'')+'>المصروفات</button><button type="button" data-t="emp"'+(tab==='emp'?' class="on"':'')+'>الموظفون والرواتب</button><button type="button" data-t="fin"'+(tab==='fin'?' class="on"':'')+'>اللوحة المالية</button><button type="button" data-t="cash"'+(tab==='cash'?' class="on"':'')+'>إقفال الصندوق</button></div><div id="mn-msg" class="sub '+msgCls+'">'+esc(msg)+'</div>';
+    var head='<div class="tabs"><button type="button" data-t="sum"'+(tab==='sum'?' class="on"':'')+'>ملخص الشهر</button><button type="button" data-t="day"'+(tab==='day'?' class="on"':'')+'>الدخل اليومي</button><button type="button" data-t="exp"'+(tab==='exp'?' class="on"':'')+'>المصروفات</button><button type="button" data-t="emp"'+(tab==='emp'?' class="on"':'')+'>الموظفون والرواتب</button><button type="button" data-t="fin"'+(tab==='fin'?' class="on"':'')+'>اللوحة المالية</button><button type="button" data-t="cash"'+(tab==='cash'?' class="on"':'')+'>إقفال الصندوق</button><button type="button" data-t="tch"'+(tab==='tch'?' class="on"':'')+'>المعلمون</button></div><div id="mn-msg" class="sub '+msgCls+'">'+esc(msg)+'</div>';
     bd.innerHTML=head+'<div id="mn-body"></div>';
     bd.querySelectorAll('.tabs button').forEach(function(b){ b.onclick=function(){ tab=b.dataset.t; msg=''; render(); }; });
     var body=bd.querySelector('#mn-body');
-    if(tab==='sum') renderSum(body); else if(tab==='day') renderDay(body); else if(tab==='exp') renderExp(body); else if(tab==='fin') renderFin(body); else if(tab==='cash') renderCash(body); else renderEmp(body);
+    if(tab==='sum') renderSum(body); else if(tab==='day') renderDay(body); else if(tab==='exp') renderExp(body); else if(tab==='fin') renderFin(body); else if(tab==='cash') renderCash(body); else if(tab==='tch') renderTeachers(body); else renderEmp(body);
   }
   function monthPicker(){ return '<label class="mp">الشهر <input data-fmt="month" inputmode="numeric" maxlength="7" placeholder="YYYY-MM" autocomplete="off" dir="ltr" id="mn-month" value="'+esc(month)+'"></label>'; }
   function bindMonth(body){ body.querySelector('#mn-month').onchange=function(){ if(/^\d{4}-(0[1-9]|1[0-2])$/.test(this.value)){ month=this.value; render(); } else say('اكتب الشهر هكذا: 2026-10','bad'); }; }
@@ -868,15 +912,19 @@ function openMoney(){
     var ex=D.expenses.filter(function(x){ return inRange(x.on_date,r[0],r[1]); }), exSum=sum(ex,function(x){return x.amount;});
     var adv=sum(D.advances.filter(function(x){ return inRange(x.on_date,r[0],r[1]); }),function(x){return x.amount;});
     var sp=sum(D.pays.filter(function(x){ return inRange(x.paid_on,r[0],r[1]); }),function(x){return x.amount;});
-    var net=coll-exSum-adv-sp, cats={};
+    var tp=sum(D.tpays.filter(function(x){ return inRange(x.paid_on,r[0],r[1]); }),function(x){return x.amount;});
+    var trf=sum(pays().filter(function(p){ return p.method==='transfer'&&p.date&&inRange(p.date,r[0],r[1]); }),function(p){return p.amount;});
+    var net=coll-exSum-adv-sp-tp, cats={};
     ex.forEach(function(x){ cats[x.category]=(cats[x.category]||0)+Number(x.amount); });
     body.innerHTML=monthPicker()+'<div class="cards">'+
       '<div class="card"><span class="l">المحصّل من الطلاب</span><b class="t-ok">'+n2(coll)+' <small>'+esc(c)+'</small></b></div>'+
       '<div class="card"><span class="l">المصروفات</span><b>'+n2(exSum)+' <small>'+esc(c)+'</small></b></div>'+
       '<div class="card"><span class="l">السلف المسحوبة</span><b>'+n2(adv)+' <small>'+esc(c)+'</small></b></div>'+
       '<div class="card"><span class="l">رواتب مدفوعة (المتبقي بعد السلف)</span><b>'+n2(sp)+' <small>'+esc(c)+'</small></b></div>'+
+      '<div class="card"><span class="l">دفعات المعلمين</span><b>'+n2(tp)+' <small>'+esc(c)+'</small></b></div>'+
+      '<div class="card"><span class="l">منها حوالات (لم تدخل الدرج)</span><b>'+n2(trf)+' <small>'+esc(c)+'</small></b></div>'+
       '<div class="card big"><span class="l">الصافي</span><b class="'+(net<0?'bad':'t-ok')+'">'+n2(net)+' <small>'+esc(c)+'</small></b></div></div>'+
-      '<p class="sub">الحساب نقدي: كل مبلغ يُحسب في تاريخ دفعه فعلاً. الصافي = المحصّل − المصروفات − السلف − الرواتب المدفوعة.</p><div class="row" style="margin:0 0 6px"><button class="btn sm primary" type="button" id="mn-pdf">تنزيل تقرير هذا الشهر PDF</button></div>'+
+      '<p class="sub">الحساب نقدي: كل مبلغ يُحسب في تاريخ دفعه فعلاً. الصافي = المحصّل − المصروفات − السلف − الرواتب − دفعات المعلمين.</p><div class="row" style="margin:0 0 6px"><button class="btn sm primary" type="button" id="mn-pdf">تنزيل تقرير هذا الشهر PDF</button></div>'+
       (Object.keys(cats).length?'<h3 class="sec">المصروفات حسب التصنيف</h3><table class="imp"><tbody>'+Object.keys(cats).sort(function(a,b){return cats[b]-cats[a];}).map(function(k){ return '<tr><td>'+esc(k)+'</td><td class="n" dir="ltr">'+n2(cats[k])+'</td></tr>'; }).join('')+'</tbody></table>':'');
     bindMonth(body);
     body.querySelector('#mn-pdf').onclick=async function(){ var b=this; b.disabled=true; try{ await downloadReport(month); say('تم حفظ التقرير.','ok'); }catch(e){ if(!(e&&e.code==='declined')) say(e&&e.message&&e.local?e.message:'تعذر إنشاء التقرير.','bad'); } b.disabled=false; };
@@ -888,16 +936,17 @@ function openMoney(){
     D.expenses.forEach(function(x){ if(inRange(x.on_date,r[0],r[1])) d(x.on_date).out+=Number(x.amount); });
     D.advances.forEach(function(x){ if(inRange(x.on_date,r[0],r[1])) d(x.on_date).out+=Number(x.amount); });
     D.pays.forEach(function(x){ if(inRange(x.paid_on,r[0],r[1])) d(x.paid_on).out+=Number(x.amount); });
+    D.tpays.forEach(function(x){ if(inRange(x.paid_on,r[0],r[1])) d(x.paid_on).out+=Number(x.amount); });
     var keys=Object.keys(days).sort().reverse(), tIn=0, tOut=0, cnt=0;
     var rows=keys.map(function(k){ var x=days[k], inn=sum(x.pays,function(p){return p.amount;}); tIn+=inn; tOut+=x.out; cnt+=x.pays.length; var net=inn-x.out;
-      var det=x.pays.slice().sort(function(a,b){return (a.at||0)-(b.at||0);}).map(function(p){ return '<li>'+esc(studentName(p.studentId)||'(طالب محذوف)')+' — <b>'+n2(p.amount)+'</b>'+(p.note?' <small>('+esc(p.note)+')</small>':'')+'</li>'; }).join('');
+      var det=x.pays.slice().sort(function(a,b){return (a.at||0)-(b.at||0);}).map(function(p){ return '<li>'+esc(studentName(p.studentId)||'(طالب محذوف)')+' — <b>'+n2(p.amount)+'</b>'+(p.method==='transfer'?' <small>(حوالة)</small>':'')+(p.note?' <small>('+esc(p.note)+')</small>':'')+'</li>'; }).join('');
       return '<tr class="dy"><td dir="ltr">'+esc(k)+'</td><td class="n">'+x.pays.length+'</td><td class="n t-ok">'+n2(inn)+'</td><td class="n">'+n2(x.out)+'</td><td class="n '+(net<0?'bad':'')+'">'+n2(net)+'</td></tr>'+(det?'<tr class="dd"><td colspan="5"><details><summary>تفاصيل الدفعات</summary><ul>'+det+'</ul></details></td></tr>':''); }).join('');
     var t=today(), todayIn=sum(days[t]?days[t].pays:[],function(p){return p.amount;});
     body.innerHTML=monthPicker()+'<div class="cards"><div class="card"><span class="l">دخل اليوم ('+esc(t)+')</span><b class="t-ok">'+n2(todayIn)+' <small>'+esc(c)+'</small></b></div>'+
       '<div class="card"><span class="l">إجمالي الدخل في الشهر</span><b class="t-ok">'+n2(tIn)+' <small>'+esc(c)+'</small></b></div>'+
       '<div class="card"><span class="l">عدد الدفعات</span><b>'+cnt+'</b></div>'+
       '<div class="card"><span class="l">متوسط يوم العمل</span><b>'+n2(keys.filter(function(k){return days[k].pays.length;}).length?tIn/keys.filter(function(k){return days[k].pays.length;}).length:0)+' <small>'+esc(c)+'</small></b></div></div>'+
-      '<table class="imp"><thead><tr><th>اليوم</th><th>الدفعات</th><th>الدخل</th><th>خرج (مصروفات وسلف ورواتب)</th><th>الصافي</th></tr></thead><tbody>'+(rows||'<tr><td colspan="5" class="empty">لا حركة في هذا الشهر.</td></tr>')+'</tbody>'+(keys.length?'<tfoot><tr><td>الإجمالي</td><td class="n">'+cnt+'</td><td class="n">'+n2(tIn)+'</td><td class="n">'+n2(tOut)+'</td><td class="n">'+n2(tIn-tOut)+'</td></tr></tfoot>':'')+'</table>';
+      '<table class="imp"><thead><tr><th>اليوم</th><th>الدفعات</th><th>الدخل</th><th>خرج (مصروفات وسلف ورواتب ومعلمون)</th><th>الصافي</th></tr></thead><tbody>'+(rows||'<tr><td colspan="5" class="empty">لا حركة في هذا الشهر.</td></tr>')+'</tbody>'+(keys.length?'<tfoot><tr><td>الإجمالي</td><td class="n">'+cnt+'</td><td class="n">'+n2(tIn)+'</td><td class="n">'+n2(tOut)+'</td><td class="n">'+n2(tIn-tOut)+'</td></tr></tfoot>':'')+'</table>';
     bindMonth(body);
   }
   function sumRange(arr,f,a,b,vf){ return arr.reduce(function(t,x){ var d=f(x); return (d>=a&&d<=b)?t+Number(vf(x)):t; },0); }
@@ -907,7 +956,8 @@ function openMoney(){
     var ex=sumRange(D.expenses,function(x){return x.on_date;},a,b,function(x){return x.amount;});
     var ad=sumRange(D.advances,function(x){return x.on_date;},a,b,function(x){return x.amount;});
     var sp=sumRange(D.pays,function(x){return x.paid_on;},a,b,function(x){return x.amount;});
-    return {m:m,coll:coll,ex:ex,ad:ad,sp:sp,out:ex+ad+sp,net:coll-ex-ad-sp};
+    var tp=sumRange(D.tpays,function(x){return x.paid_on;},a,b,function(x){return x.amount;});
+    return {m:m,coll:coll,ex:ex,ad:ad,sp:sp,tp:tp,out:ex+ad+sp+tp,net:coll-ex-ad-sp-tp};
   }
   function niceMax(v){ if(v<=0) return 100; var p=Math.pow(10,Math.floor(Math.log(v)/Math.LN10)), n=v/p; return (n<=1?1:n<=2?2:n<=5?5:10)*p; }
   function renderFin(body){
@@ -929,20 +979,20 @@ function openMoney(){
       '<div class="card"><span class="l">صافي هذا الشهر</span><b class="'+(cur0.net<0?'bad':'t-ok')+'">'+n2(cur0.net)+' <small>'+esc(c)+'</small></b></div>'+
       '<div class="card"><span class="l">مقارنة بالشهر الماضي ('+esc(prev.m)+')</span><b class="'+(delta<0?'bad':'t-ok')+'">'+(delta>=0?'+':'−')+n2(Math.abs(delta))+' <small>'+esc(c)+'</small></b><span class="l">الصافي السابق: '+n2(prev.net)+'</span></div>'+
       '<div class="card"><span class="l">متبقٍ على الطلاب (يُنتظر تحصيله)</span><b>'+n2(owing)+' <small>'+esc(c)+'</small></b></div></div>'+
-      '<h3 class="sec">آخر 6 أشهر</h3><div class="legend"><span><i style="background:var(--accent)"></i>المحصّل</span><span><i style="background:var(--gold)"></i>الخارج (مصروفات وسلف ورواتب)</span></div>'+svg+
-      '<table class="imp"><thead><tr><th>الشهر</th><th>المحصّل</th><th>مصروفات</th><th>سلف</th><th>رواتب</th><th>الصافي</th></tr></thead><tbody>'+
-      tot.slice().reverse().map(function(x){ return '<tr><td dir="ltr">'+esc(x.m)+'</td><td class="n t-ok">'+n2(x.coll)+'</td><td class="n">'+n2(x.ex)+'</td><td class="n">'+n2(x.ad)+'</td><td class="n">'+n2(x.sp)+'</td><td class="n '+(x.net<0?'bad':'')+'"><b>'+n2(x.net)+'</b></td></tr>'; }).join('')+'</tbody></table>';
+      '<h3 class="sec">آخر 6 أشهر</h3><div class="legend"><span><i style="background:var(--accent)"></i>المحصّل</span><span><i style="background:var(--gold)"></i>الخارج (مصروفات وسلف ورواتب ومعلمون)</span></div>'+svg+
+      '<table class="imp"><thead><tr><th>الشهر</th><th>المحصّل</th><th>مصروفات</th><th>سلف</th><th>رواتب</th><th>معلمون</th><th>الصافي</th></tr></thead><tbody>'+
+      tot.slice().reverse().map(function(x){ return '<tr><td dir="ltr">'+esc(x.m)+'</td><td class="n t-ok">'+n2(x.coll)+'</td><td class="n">'+n2(x.ex)+'</td><td class="n">'+n2(x.ad)+'</td><td class="n">'+n2(x.sp)+'</td><td class="n">'+n2(x.tp)+'</td><td class="n '+(x.net<0?'bad':'')+'"><b>'+n2(x.net)+'</b></td></tr>'; }).join('')+'</tbody></table>';
   }
   var cashDay=today(), cashMsg='', cashCls='';
   function renderCash(body){
     body.innerHTML='جارٍ التحميل…'; var day=cashDay, c=cur();
     Promise.all([rpc('cash_summary',{p_day:day}),http('GET','/rest/v1/cash_closings?select=*&order=day.desc&limit=30')]).then(function(r){
-      var s=(r[0]&&r[0][0])||{collected:0,expenses:0,advances:0,salaries:0}, list=r[1].data||[];
-      var coll=Number(s.collected), ex=Number(s.expenses), ad=Number(s.advances), sa=Number(s.salaries), exp=coll-ex-ad-sa;
+      var s=(r[0]&&r[0][0])||{collected:0,transfers:0,expenses:0,advances:0,salaries:0,teachers:0}, list=r[1].data||[];
+      var coll=Number(s.collected), trf=Number(s.transfers), tch=Number(s.teachers), ex=Number(s.expenses), ad=Number(s.advances), sa=Number(s.salaries), exp=coll-trf-ex-ad-sa-tch;
       var done=list.filter(function(x){return x.day===day;})[0];
-      body.innerHTML='<p class="sub" style="margin-top:0">في آخر اليوم عُدّ ما في الدرج وقارنه بما سجّلته المنظومة. أي فرق يُحفظ بتاريخه لتراجعه لاحقاً. المتوقع = المحصّل − المصروفات − السلف − الرواتب المدفوعة في ذلك اليوم.</p>'+
+      body.innerHTML='<p class="sub" style="margin-top:0">في آخر اليوم عُدّ ما في الدرج وقارنه بما سجّلته المنظومة. أي فرق يُحفظ بتاريخه لتراجعه لاحقاً. المتوقع في الدرج = المحصّل نقداً (دون الحوالات) − المصروفات − السلف − الرواتب − دفعات المعلمين في ذلك اليوم.</p>'+
         '<div class="filters frm"><label>اليوم<input id="cs-day" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="YYYY-MM-DD" autocomplete="off" dir="ltr" value="'+esc(day)+'"></label></div>'+
-        '<div class="cards"><div class="card"><span class="l">المحصّل من الطلاب</span><b class="t-ok">'+n2(coll)+' <small>'+esc(c)+'</small></b></div><div class="card"><span class="l">مصروفات</span><b>'+n2(ex)+'</b></div><div class="card"><span class="l">سلف</span><b>'+n2(ad)+'</b></div><div class="card"><span class="l">رواتب مدفوعة</span><b>'+n2(sa)+'</b></div><div class="card big"><span class="l">المتوقع في الدرج من حركة اليوم</span><b>'+n2(exp)+' <small>'+esc(c)+'</small></b></div></div>'+
+        '<div class="cards"><div class="card"><span class="l">المحصّل من الطلاب (الكل)</span><b class="t-ok">'+n2(coll)+' <small>'+esc(c)+'</small></b></div><div class="card"><span class="l">منها حوالات (خارج الدرج)</span><b>'+n2(trf)+'</b></div><div class="card"><span class="l">دفعات المعلمين</span><b>'+n2(tch)+'</b></div><div class="card"><span class="l">مصروفات</span><b>'+n2(ex)+'</b></div><div class="card"><span class="l">سلف</span><b>'+n2(ad)+'</b></div><div class="card"><span class="l">رواتب مدفوعة</span><b>'+n2(sa)+'</b></div><div class="card big"><span class="l">المتوقع في الدرج من حركة اليوم</span><b>'+n2(exp)+' <small>'+esc(c)+'</small></b></div></div>'+
         (done?'<div class="sub warn">أُقفل هذا اليوم سابقاً (الفعلي '+n2(done.counted)+'، الفرق '+n2(done.diff)+'). الإقفال من جديد يستبدله.</div>':'')+
         '<div class="filters frm"><label>المبلغ الفعلي في الدرج ('+esc(c)+')<input id="cs-cnt" data-fmt="num" inputmode="decimal" autocomplete="off" dir="ltr" value="'+(done?esc(done.counted):'')+'"></label><label class="grow">ملاحظة (اختياري)<input id="cs-note" maxlength="200" value="'+esc(done?done.note:'')+'"></label><button class="btn sm primary" id="cs-go" type="button">'+(done?'إعادة إقفال اليوم':'إقفال اليوم')+'</button></div><div id="cs-diff" class="sub"></div>'+
         '<h3 class="sec">آخر الإقفالات</h3><table class="imp"><thead><tr><th>اليوم</th><th>المتوقع</th><th>الفعلي</th><th>الفرق</th><th>ملاحظة</th><th></th></tr></thead><tbody>'+
@@ -971,10 +1021,12 @@ function openMoney(){
     D.expenses.forEach(function(x){ if(inRange(x.on_date,a,b)) dd(x.on_date).o+=Number(x.amount); });
     D.advances.forEach(function(x){ if(inRange(x.on_date,a,b)) dd(x.on_date).o+=Number(x.amount); });
     D.pays.forEach(function(x){ if(inRange(x.paid_on,a,b)) dd(x.paid_on).o+=Number(x.amount); });
+    D.tpays.forEach(function(x){ if(inRange(x.paid_on,a,b)) dd(x.paid_on).o+=Number(x.amount); });
+    var tchRows=D.teachers.map(function(t){ var v=sum(D.tpays.filter(function(x){return x.teacher_id===t.id&&inRange(x.paid_on,a,b);}),function(x){return x.amount;}); return v>0?[t.name,n2(v)]:null; }).filter(Boolean);
     var dayRows=Object.keys(days).sort().map(function(k){ var x=days[k]; return [k,String(x.n),n2(x.i),n2(x.o),n2(x.i-x.o)]; });
     var cn=document.getElementById('centerName'), center=(cn&&cn.textContent)||'مركز نون';
     var W=1100,SC=1.5,M=70,R=W-M, sect=function(rows){ return 110+Math.max(rows.length,1)*52; };
-    var H=230+250+sect(catRows)+sect(empRows)+sect(dayRows)+190;
+    var H=230+250+sect(catRows)+sect(empRows)+sect(tchRows)+sect(dayRows)+190;
     var FONT='"IBM Plex Sans Arabic",Tajawal,"Segoe UI",Tahoma,sans-serif';
     try{ await Promise.race([Promise.all([document.fonts.load('500 24px '+FONT),document.fonts.load('700 24px '+FONT)]),new Promise(function(r0){ setTimeout(r0,1500); })]); }catch(e){}
     var logo=await new Promise(function(res){ if(!window.NOON_LOGO){ res(null); return; } var im=new Image(); im.onload=function(){ res(im); }; im.onerror=function(){ res(null); }; im.src=window.NOON_LOGO; setTimeout(function(){ res(null); },1500); });
@@ -987,7 +1039,7 @@ function openMoney(){
     var hx=R; if(logo){ var lh=150, lw=lh*logo.naturalWidth/logo.naturalHeight; x.drawImage(logo,R-lw,20,lw,lh); hx=R-lw-26; }
     T(center,hx,86,44,700,'#F4E3B0'); T('التقرير المالي الشهري',hx,142,30,500,'#A9C4BF');
     T(m,M,86,40,700,'#fff','left'); T('أُنشئ: '+today(),M,142,24,500,'#A9C4BF','left');
-    var y0=232, cw2=(W-2*M-30)/2, cards=[['المحصّل من الطلاب',n2(T0.coll),OKC],['المصروفات',n2(T0.ex),INK],['السلف والرواتب المدفوعة',n2(T0.ad+T0.sp),INK],['الصافي',n2(T0.net),T0.net<0?CR:GR]];
+    var y0=232, cw2=(W-2*M-30)/2, cards=[['المحصّل من الطلاب',n2(T0.coll),OKC],['المصروفات',n2(T0.ex),INK],['السلف والرواتب ودفعات المعلمين',n2(T0.ad+T0.sp+T0.tp),INK],['الصافي',n2(T0.net),T0.net<0?CR:GR]];
     cards.forEach(function(cd,i){ var cx=R-(i%2)*(cw2+30)-cw2, cy=y0+Math.floor(i/2)*118; x.strokeStyle=LN; x.lineWidth=2; box(cx,cy,cw2,100,16); x.stroke();
       T(cd[0],cx+cw2-24,cy+36,24,500,MU); T(cd[1]+' '+c,cx+cw2-24,cy+82,38,700,cd[2]); });
     var y=y0+250;
@@ -1001,6 +1053,7 @@ function openMoney(){
     }
     table('المصروفات حسب التصنيف',['التصنيف','المبلغ'],catRows,[[R-18,'right'],[M+18,'left']]);
     table('الموظفون',['الموظف','السلف','الراتب المدفوع','الإجمالي'],empRows,[[R-18,'right'],[R-430,'right'],[R-650,'right'],[M+18,'left']]);
+    table('دفعات المعلمين',['المعلم','المدفوع'],tchRows,[[R-18,'right'],[M+18,'left']]);
     table('الحركة اليومية',['اليوم','الدفعات','الدخل','الخارج','الصافي'],dayRows,[[R-18,'right'],[R-250,'right'],[R-420,'right'],[R-650,'right'],[M+18,'left']]);
     T('تقرير داخلي للمالك — الحساب نقدي: كل مبلغ في تاريخ دفعه فعلاً.',W/2,H-40,22,500,MU,'center');
     var blob=await new Promise(function(res){ cv.toBlob(res,'image/jpeg',0.92); });
@@ -1009,6 +1062,56 @@ function openMoney(){
     if(!window.__app||!window.__app.buildPdf) throw (function(){ var e=new Error('تعذر إنشاء PDF'); e.local=true; return e; })();
     var pdf=window.__app.buildPdf(jpeg,cv.width,cv.height,'تقرير '+m);
     var d=await window.claude.use('downloads'); await d.save({filename:'noon-report-'+m+'.pdf',data:pdf});
+  }
+
+  async function renderTeachers(body){
+    body.innerHTML='جارٍ التحميل…'; var c=cur(), m0=month+'-01', dues;
+    try{ dues=await rpc('teacher_dues',{p_month:m0}); }catch(e){ body.innerHTML='<div class="bad">'+esc(adminErr(e))+'</div>'; return; }
+    var tn=function(id){ var t=D.teachers.filter(function(x){return x.id===id;})[0]; return t?t.name:'(معلم)'; };
+    var html=monthPicker()+'<div class="row" style="margin:0 0 10px"><button class="btn sm primary" type="button" id="th-new">إضافة معلم</button></div><div id="th-form"></div>'+
+      '<p class="sub" style="margin-top:0">المستحق للمعلم: إما نسبة من المبالغ التي دفعها طلاب اشتراكاته خلال الشهر، أو مبلغ ثابت شهري. اربط كل اشتراك بمعلمه عند تسجيل الاشتراك. تُحسب النسبة على ما دُفع فعلاً (بعد الخصم).</p>'+
+      '<table class="imp"><thead><tr><th>المعلم</th><th>الأجر</th><th>محصّل من طلابه</th><th>المستحق</th><th>المدفوع</th><th>المتبقي</th><th></th></tr></thead><tbody>'+
+      (dues.length?dues.map(function(x){ return '<tr data-id="'+esc(x.teacher_id)+'"><td><b>'+esc(x.name)+'</b>'+(x.active?'':' <small>(متوقف)</small>')+'</td><td>'+(x.pay_type==='percent'?n2(x.rate)+'%':(x.pay_type==='fixed'?'ثابت '+n2(x.rate):'<span class="bad">غير محدد</span>'))+'</td><td class="n">'+(x.pay_type==='percent'?n2(x.base):'—')+'</td><td class="n">'+n2(x.due)+'</td><td class="n t-ok">'+n2(x.paid)+'</td><td class="n '+(Number(x.remaining)>0?'warn':'')+'"><b>'+n2(x.remaining)+'</b></td><td class="nw"><button class="btn sm primary th-pay" type="button"'+(Number(x.remaining)>0?'':' disabled')+'>دفع</button> <button class="btn sm th-edit" type="button">تعديل</button></td></tr>'; }).join(''):'<tr><td colspan="7" class="empty">لا يوجد معلمون بعد.</td></tr>')+'</tbody></table>'+
+      '<h3 class="sec">دفعات هذا الشهر</h3><table class="imp"><tbody>'+
+      (function(){ var a=monthRange(month), l=D.tpays.filter(function(x){return inRange(x.paid_on,a[0],a[1]);}); return l.length?l.map(function(x){ return '<tr><td dir="ltr">'+esc(x.paid_on)+'</td><td>'+esc(tn(x.teacher_id))+'</td><td class="n">'+n2(x.amount)+'</td><td>'+esc(x.note||'')+'</td><td><button class="btn sm th-rm" data-id="'+esc(x.id)+'" type="button">حذف</button></td></tr>'; }).join(''):'<tr><td class="empty">لا دفعات.</td></tr>'; })()+'</tbody></table>';
+    body.innerHTML=html+'<div class="sub '+msgCls+'">'+esc(msg)+'</div>'; bindMonth(body);
+    var box=body.querySelector('#th-form');
+    function termOf(id){ var best=null; D.terms.forEach(function(t){ if(t.teacher_id===id&&t.from_date<=today()&&(!best||t.from_date>best.from_date)) best=t; }); return best; }
+    function form(t){
+      var tm=t?termOf(t.id):null;
+      frm(box,'<label>الاسم<input name="name" required maxlength="80" value="'+esc(t?t.name:'')+'"></label><label>الهاتف<input name="ph" dir="ltr" maxlength="30" value="'+esc(t?t.phone:'')+'"></label>'+
+        '<label>نوع الأجر<select name="pt"><option value="percent"'+((!tm||tm.pay_type==='percent')?' selected':'')+'>نسبة من المحصّل %</option><option value="fixed"'+(tm&&tm.pay_type==='fixed'?' selected':'')+'>مبلغ ثابت شهرياً</option></select></label>'+
+        '<label>القيمة (نسبة أو مبلغ)<input name="rate" data-fmt="num" inputmode="decimal" autocomplete="off" required dir="ltr" value="'+(tm?esc(tm.rate):'')+'"></label>'+
+        '<label>يسري من تاريخ<input name="from" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="YYYY-MM-DD" autocomplete="off" dir="ltr" required value="'+esc(tm?today():today().slice(0,8)+'01')+'"></label>'+
+        (t?'<label>الحالة<select name="act"><option value="1"'+(t.active?' selected':'')+'>يعمل</option><option value="0"'+(t.active?'':' selected')+'>متوقف</option></select></label>':''),
+        async function(f,sid){
+          var name=f.name.value.trim(), rate=Number(f.rate.value), from=f.from.value, pt=f.pt.value;
+          if(!name||!(rate>=0)||!okDate(from)) throw lerr('تحقق من الاسم والقيمة والتاريخ.');
+          if(pt==='percent'&&rate>100) throw lerr('النسبة لا تزيد على 100.');
+          var id=t?t.id:sid;
+          if(t) await w('PATCH','/rest/v1/teachers?id=eq.'+id,{name:name,phone:f.ph.value.trim(),active:f.act.value==='1'});
+          else { try{ await w('POST','/rest/v1/teachers',{id:id,name:name,phone:f.ph.value.trim()}); }catch(er){ if(er.code!=='23505') throw er; } }
+          var cur0=D.terms.filter(function(x){ return x.teacher_id===id&&x.from_date<=from; }).sort(function(a,b){return a.from_date<b.from_date?1:-1;})[0];
+          if(!cur0||cur0.pay_type!==pt||Number(cur0.rate)!==rate){
+            var same=D.terms.filter(function(x){ return x.teacher_id===id&&x.from_date===from; })[0];
+            if(same) await w('PATCH','/rest/v1/teacher_terms?id=eq.'+same.id,{pay_type:pt,rate:rate});
+            else await w('POST','/rest/v1/teacher_terms',{teacher_id:id,from_date:from,pay_type:pt,rate:rate});
+          }
+        }, t?'تم حفظ بيانات المعلم.':'أُضيف المعلم.');
+      box.scrollIntoView({block:'nearest'});
+    }
+    body.querySelector('#th-new').onclick=function(){ form(null); };
+    body.querySelectorAll('tr[data-id]').forEach(function(tr){
+      var t=D.teachers.filter(function(x){return x.id===tr.dataset.id;})[0], d=dues.filter(function(x){return x.teacher_id===tr.dataset.id;})[0];
+      tr.querySelector('.th-edit').onclick=function(){ form(t); };
+      tr.querySelector('.th-pay').onclick=function(){
+        frm(box,'<label>المعلم<input disabled value="'+esc(t.name)+'"></label><label>عن شهر<input disabled dir="ltr" value="'+esc(month)+'"></label><label>المبلغ<input name="a" data-fmt="num" inputmode="decimal" autocomplete="off" required dir="ltr" value="'+esc(Math.max(0,Number(d.remaining)))+'"></label><label>تاريخ الدفع<input name="d" data-fmt="date" inputmode="numeric" maxlength="10" autocomplete="off" dir="ltr" required value="'+esc(today())+'"></label><label class="grow">ملاحظة<input name="n" maxlength="200"></label>',
+          async function(f,sid){ var a=Number(f.a.value); if(!(a>0)||!okDate(f.d.value)) throw lerr('أدخل مبلغاً وتاريخاً صحيحين.');
+            if(a>Number(d.remaining)&&!confirm('المبلغ أكبر من المتبقي ('+n2(d.remaining)+'). متابعة؟')) throw lerr('لم يُسجَّل الدفع.');
+            try{ await w('POST','/rest/v1/teacher_payments',{id:sid,teacher_id:t.id,period_start:m0,amount:a,paid_on:f.d.value,note:f.n.value.trim()}); }catch(er){ if(er.code!=='23505') throw er; } },'سُجّل دفع المعلم.');
+        box.scrollIntoView({block:'nearest'}); };
+    });
+    body.querySelectorAll('.th-rm').forEach(function(b){ b.onclick=async function(){ if(!confirm('حذف هذه الدفعة؟')) return; try{ await w('DELETE','/rest/v1/teacher_payments?id=eq.'+b.dataset.id); if(await load()){ msg='تم الحذف.'; msgCls='ok'; render(); } }catch(er){ say(friendly(er).message,'bad'); } }; });
   }
   function renderExp(body){
     var r=monthRange(month), c=cur(), list=D.expenses.filter(function(x){ return inRange(x.on_date,r[0],r[1]); }), total=sum(list,function(x){return x.amount;});
@@ -1175,6 +1278,9 @@ function injectUi(){
     var a=document.createElement('button'); a.className='tab-btn'; a.type='button'; a.id='noon-nav-accounts';
     a.innerHTML='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M17 11l2 2 3-4"/></svg><span>إدارة الحسابات</span>';
     a.onclick=function(){ openAccounts(); }; nav.appendChild(a);
+    var iq=document.createElement('button'); iq.className='tab-btn'; iq.type='button'; iq.id='noon-nav-inq';
+    iq.innerHTML='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg><span>الاستفسارات</span>';
+    iq.onclick=function(){ openInquiries(); }; nav.appendChild(iq);
     var tr=document.createElement('button'); tr.className='tab-btn'; tr.type='button'; tr.id='noon-nav-trash';
     tr.innerHTML='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg><span>سلة المحذوفات</span>';
     tr.onclick=function(){ openTrash(); }; nav.appendChild(tr);
@@ -1642,6 +1748,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 
           <option value="owing">عليهم مبلغ متبقٍ</option>
           <option value="visit">حصص منفردة فقط</option>
         <option value="none">بدون اشتراك</option>
+          <option value="paused">موقوف مؤقتاً</option>
+          <option value="withdrawn">منسحب</option>
         </select>
         <span id="stu-count" class="muted"></span>
       </div>
@@ -1921,6 +2029,7 @@ function balHtml(b){ return b>0?'<span class="t-crit">'+esc(mny(b))+'</span>':'<
 /* ---------- alerts ---------- */
 function alertKind(r){
   var k=r.status.key;
+  if(r.st.status==='paused'||r.st.status==='withdrawn') return r.balance>0?'owing':null;
   if(k==='soon') return 'soon';
   if(k==='expired'&&(r.status.over<=30||r.balance>0)) return 'expired';
   if(r.balance>0) return 'owing';
@@ -2054,9 +2163,9 @@ function renderDash(){
     $('#recent').innerHTML=''; return;
   }
   var rows=D.rows;
-  var active=rows.filter(function(r){return r.status.key==='active'||r.status.key==='soon'||r.status.key==='upcoming';}).length;
-  var soon=rows.filter(function(r){return r.status.key==='soon';}).length;
-  var expired=rows.filter(function(r){return r.status.key==='expired';}).length;
+  var active=rows.filter(function(r){return (r.st.status||'active')==='active'&&(r.status.key==='active'||r.status.key==='soon'||r.status.key==='upcoming');}).length;
+  var soon=rows.filter(function(r){return (r.st.status||'active')==='active'&&r.status.key==='soon';}).length;
+  var expired=rows.filter(function(r){return (r.st.status||'active')==='active'&&r.status.key==='expired';}).length;
   var owingRows=rows.filter(function(r){return r.balance>0;});
   var owingTotal=r3(owingRows.reduce(function(t,r){return t+r.balance;},0));
   var ym=D.today.slice(0,7);
@@ -2105,7 +2214,9 @@ function filteredRows(){
       var hay=norm(r.st.name)+' '+norm(r.st.phone)+' '+norm(r.st.guardian)+' '+norm(r.st.guardianPhone);
       if(hay.indexOf(q)<0) return false;
     }
-    var k=r.status.key;
+    var k=r.status.key, st0=r.st.status||'active';
+    if(f==='paused'||f==='withdrawn') return st0===f;
+    if((f==='active'||f==='soon'||f==='expired')&&st0!=='active') return false;
     if(f==='active') return k==='active'||k==='soon'||k==='upcoming';
     if(f==='soon') return k==='soon';
     if(f==='expired') return k==='expired';
@@ -2130,7 +2241,7 @@ function renderStudents(){
     var s=r.status;
     return '<tr data-id="'+esc(r.st.id)+'">'+
       '<td><button class="linklike" type="button" data-act="open" data-id="'+esc(r.st.id)+'">'+esc(r.st.name)+'</button>'+
-        (r.st.phone?'<div class="sub"><bdi dir="ltr">'+esc(r.st.phone)+'</bdi></div>':'')+'</td>'+
+        (r.st.status&&r.st.status!=='active'?' <span class="pill mute">'+(r.st.status==='paused'?'موقوف':'منسحب')+'</span>':'')+(r.st.phone?'<div class="sub"><bdi dir="ltr">'+esc(r.st.phone)+'</bdi></div>':'')+'</td>'+
       '<td>'+esc(s.course||'—')+'</td>'+
       '<td class="n">'+(s.end?fmtDate(s.end)+'<div class="sub">'+esc(statusSub(s))+'</div>':(s.key==='visit'?'<span class="sub">حصة بتاريخ '+fmtDate(s.visitDate)+'</span>':'—'))+'</td>'+
       '<td>'+statusPill(s)+'</td>'+
@@ -2170,7 +2281,7 @@ function renderReports(){
   html+='<div class="panel" style="margin-bottom:18px"><div class="panel-head"><h2>دفعات '+esc(label)+'</h2></div><div class="tablewrap" style="border:0;border-radius:0"><table class="tbl"><thead><tr><th>التاريخ</th><th>الطالب</th><th>الدورة</th><th>ملاحظة</th><th>المبلغ</th></tr></thead><tbody>';
   html+=pays.length?pays.map(function(p){
     var r=D.byId[p.studentId], s=subById[p.subId];
-    return '<tr><td class="n">'+fmtDate(p.date)+'</td><td>'+(r?'<button class="linklike" type="button" data-act="open" data-id="'+esc(r.st.id)+'">'+esc(r.st.name)+'</button>':'—')+'</td><td>'+esc(s?s.course:'')+'</td><td>'+esc(p.note||'')+'</td><td class="n">'+esc(mny(p.amount))+'</td></tr>';
+    return '<tr><td class="n">'+fmtDate(p.date)+'</td><td>'+(r?'<button class="linklike" type="button" data-act="open" data-id="'+esc(r.st.id)+'">'+esc(r.st.name)+'</button>':'—')+'</td><td>'+esc(s?s.course:'')+'</td><td>'+(p.method==='transfer'?'<span class="pill info">حوالة</span> ':'')+esc(p.note||'')+'</td><td class="n">'+esc(mny(p.amount))+'</td></tr>';
   }).join(''):'<tr><td colspan="5" class="empty">لا توجد دفعات في هذا الشهر.</td></tr>';
   html+='</tbody>'+(pays.length&&!isStaff()?'<tfoot><tr><td colspan="4">الإجمالي</td><td class="n">'+esc(mny(total))+'</td></tr></tfoot>':'')+'</table></div></div>';
 
@@ -2226,7 +2337,12 @@ function subFieldsHtml(pre,o){
     '<div class="field monthly-only"><label for="'+pre+'-months">المدة (بالأشهر)</label><input id="'+pre+'-months" data-f="months" type="text" inputmode="numeric" maxlength="2" class="ltr" value="'+esc(o.months||1)+'"></div>'+
     '<div class="field monthly-only"><label for="'+pre+'-end">تاريخ الانتهاء</label><input id="'+pre+'-end" data-f="end" class="ltr dateinput" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off" value="'+esc(fmtDate(o.end||''))+'"></div>'+
     '<div class="field"><label for="'+pre+'-fee">الرسوم ('+esc(S.settings.currency)+')</label><input id="'+pre+'-fee" data-f="fee" inputmode="decimal" class="ltr" value="'+esc(o.fee||'')+'"></div>'+
+    '<div class="field"><label for="'+pre+'-dtype">الخصم</label><div class="row" style="gap:6px;flex-wrap:nowrap"><select id="'+pre+'-dtype" data-f="dtype" style="width:auto"><option value="">بدون</option><option value="pct">نسبة %</option><option value="amt">مبلغ</option></select><input data-f="dval" inputmode="decimal" class="ltr" placeholder="0" style="min-width:0" disabled></div></div>'+
+    '<div class="field" data-dis hidden><label for="'+pre+'-dreason">سبب الخصم (يظهر في الإيصال)</label><input id="'+pre+'-dreason" data-f="dreason" maxlength="200" autocomplete="off"></div>'+
+    '<div class="field wide" data-net hidden></div>'+
     '<div class="field"><label for="'+pre+'-paid">المدفوع الآن ('+esc(S.settings.currency)+')</label><input id="'+pre+'-paid" data-f="paid" inputmode="decimal" class="ltr" placeholder="0" value=""></div>'+
+    '<div class="field"><label for="'+pre+'-method">طريقة الدفع</label><select id="'+pre+'-method" data-f="method"><option value="cash">نقداً</option><option value="transfer">حوالة / تحويل</option></select></div>'+
+    teacherFieldHtml(pre,o)+
   '</div>';
 }
 function readSubFields(box,required){
@@ -2250,10 +2366,19 @@ function readSubFields(box,required){
   }
   var fee=parseAmt(feeRaw);
   if(isNaN(fee)) return {error:'اكتب الرسوم كرقم صحيح.'};
+  var dt=g('dtype'), dv=g('dval'), disc=0, dpct=null, dreason=g('dreason');
+  if(dt){
+    var dn=parseAmt(dv); if(isNaN(dn)||dn<=0) return {error:'اكتب قيمة الخصم كرقم أكبر من صفر، أو اختر «بدون».'};
+    if(dt==='pct'){ if(dn>100) return {error:'نسبة الخصم لا تزيد على 100%.'}; dpct=dn; disc=r3(fee*dn/100); } else disc=r3(dn);
+    if(disc>fee) return {error:'الخصم أكبر من الرسوم.'};
+    if(!dreason) return {error:'اكتب سبب الخصم.'};
+  }
+  var net=r3(fee-disc);
   var paid=paidRaw===''?0:parseAmt(paidRaw);
   if(isNaN(paid)) return {error:'المبلغ المدفوع غير صحيح.'};
-  if(paid>fee) return {error:'المدفوع ('+money(paid)+') أكبر من الرسوم ('+money(fee)+').'};
-  return {kind:session?'session':'month',course:course,start:start,months:months,end:end,fee:fee,paid:paid};
+  if(paid>net) return {error:'المدفوع ('+money(paid)+') أكبر من الرسوم بعد الخصم ('+money(net)+').'};
+  var tEl=box.querySelector('[data-f="teacher"]');
+  return {kind:session?'session':'month',course:course,start:start,months:months,end:end,fee:net,paid:paid,discount:disc,discountPct:dpct,discountReason:disc>0?dreason:'',method:g('method')==='transfer'?'transfer':'cash',teacherId:tEl&&tEl.value?tEl.value:''};
 }
 function autoFee(box){
   if(!box) return;
@@ -2266,9 +2391,9 @@ function autoFee(box){
 }
 async function writeSub(studentId,v){
   var ref=S.db.collection('subs').doc();
-  await ref.set(Object.assign({studentId:studentId,course:v.course,start:v.start,months:v.months,end:v.end,fee:v.fee,at:Date.now()},v.kind==='session'?{kind:'session'}:{}));
+  await ref.set(Object.assign({studentId:studentId,course:v.course,start:v.start,months:v.months,end:v.end,fee:v.fee,at:Date.now()},v.kind==='session'?{kind:'session'}:{},v.discount>0?{discount:v.discount,discountPct:v.discountPct,discountReason:v.discountReason}:{},v.teacherId?{teacherId:v.teacherId}:{}));
   if(v.paid>0){
-    await S.db.collection('payments').doc().set({studentId:studentId,subId:ref.id,amount:v.paid,date:todayStr(),note:'دفعة عند الاشتراك',at:Date.now()});
+    await S.db.collection('payments').doc().set({studentId:studentId,subId:ref.id,amount:v.paid,date:todayStr(),note:'دفعة عند الاشتراك',method:v.method==='transfer'?'transfer':'cash',at:Date.now()});
   }
 }
 
@@ -2283,6 +2408,7 @@ function openStudentForm(id){
       '<div class="field"><label for="fs-guardian">ولي الأمر</label><input id="fs-guardian" maxlength="120" value="'+esc(st.guardian||'')+'"></div>'+
       '<div class="field"><label for="fs-gphone">هاتف ولي الأمر</label><input id="fs-gphone" class="ltr" inputmode="tel" value="'+esc(st.guardianPhone||'')+'"></div>'+
       '<div class="field wide"><label for="fs-notes">ملاحظات</label><input id="fs-notes" maxlength="300" value="'+esc(st.notes||'')+'"></div>'+
+      (r?'<div class="field wide"><label for="fs-status">حالة الطالب</label><select id="fs-status"><option value="active"'+((st.status||'active')==='active'?' selected':'')+'>نشط</option><option value="paused"'+(st.status==='paused'?' selected':'')+'>موقوف مؤقتاً (لا تظهر له تنبيهات)</option><option value="withdrawn"'+(st.status==='withdrawn'?' selected':'')+'>منسحب (تبقى بياناته وسجل دفعاته)</option></select></div>':'')+
     '</div>'+
     (r?'':'<fieldset><legend>تفعيل الاشتراك</legend>'+subFieldsHtml('ns',{start:todayStr(),end:subEnd(todayStr(),1),months:1})+
       '<p class="hint">اكتب التاريخ بالشكل 05/11/2026 (يوم/شهر/سنة). تاريخ الانتهاء يُحسب تلقائياً من البداية والمدة، ويمكنك تغييره. اختر «حصة واحدة فقط» للطالب الذي يحضر حصة ويغادر، فلا حاجة لبداية ونهاية. اترك الدورة فارغة لتسجيل الطالب بدون اشتراك الآن.</p></fieldset>')+
@@ -2298,6 +2424,7 @@ async function submitStudent(form){
   if(!S.db){ err.textContent='التخزين غير متاح، لا يمكن الحفظ.'; return; }
   if(!name){ err.textContent='اكتب اسم الطالب.'; return; }
   var data={name:name,phone:latinDigits($('#fs-phone').value).trim(),guardian:$('#fs-guardian').value.trim(),guardianPhone:latinDigits($('#fs-gphone').value).trim(),notes:$('#fs-notes').value.trim()};
+  if(id&&$('#fs-status')) data.status=$('#fs-status').value;
   var sub=null;
   if(!id){
     sub=readSubFields(form.querySelector('fieldset'),false);
@@ -2340,6 +2467,7 @@ function openDetail(id,opts){
         '<div class="field"><label for="pay-sub">الاشتراك</label><select id="pay-sub"></select></div>'+
         '<div class="field"><label for="pay-amt">المبلغ</label><input id="pay-amt" class="ltr" inputmode="decimal"></div>'+
         '<div class="field"><label for="pay-date">التاريخ</label><input id="pay-date" class="ltr dateinput" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off"></div>'+
+        '<div class="field"><label for="pay-method">طريقة الدفع</label><select id="pay-method"><option value="cash">نقداً</option><option value="transfer">حوالة / تحويل</option></select></div>'+
         '<div class="field"><label for="pay-note">ملاحظة</label><input id="pay-note" maxlength="200"></div>'+
       '</div><div class="err" id="pay-err" role="alert"></div>'+
       '<div class="row"><button class="btn primary" type="submit">حفظ الدفعة</button><button class="btn" type="button" data-act="panel" data-panel="">إلغاء</button></div>'+
@@ -2376,7 +2504,7 @@ function renderDetail(){
   var contacts=[];
   if(st.phone) contacts.push('الطالب: <bdi dir="ltr">'+esc(st.phone)+'</bdi>');
   if(st.guardian||st.guardianPhone) contacts.push('ولي الأمر: '+esc(st.guardian||'')+(st.guardianPhone?' <bdi dir="ltr">'+esc(st.guardianPhone)+'</bdi>':''));
-  $('#d-head').innerHTML='<h2>'+esc(st.name)+'</h2><div class="sub" style="margin-top:4px">'+statusPill(r.status)+' '+esc(r.status.course||'')+(r.status.end?' · ينتهي '+fmtDate(r.status.end):'')+'</div>'+
+  $('#d-head').innerHTML='<h2>'+esc(st.name)+'</h2><div class="sub" style="margin-top:4px">'+statusPill(r.status)+(st.status==='paused'?' <span class="pill warn">موقوف مؤقتاً</span>':st.status==='withdrawn'?' <span class="pill crit">منسحب</span>':'')+' '+esc(r.status.course||'')+(r.status.end?' · ينتهي '+fmtDate(r.status.end):'')+'</div>'+
     (contacts.length?'<div class="sub" style="margin-top:6px">'+contacts.join(' · ')+'</div>':'')+
     (st.notes?'<div class="sub" style="margin-top:4px">'+esc(st.notes)+'</div>':'')+
     '<div class="sub" style="margin-top:4px">تاريخ التسجيل: '+(st.joined?fmtDate(st.joined):'—')+'</div>';
@@ -2387,7 +2515,7 @@ function renderDetail(){
 
   $('#d-subs').innerHTML=r.subs.length?r.subs.map(function(s){
     var ss=subState(s,today), sess=s.kind==='session', pill=sess?'<span class="pill info">حصة منفردة</span>':ss==='active'?'<span class="pill ok">ساري</span>':ss==='upcoming'?'<span class="pill info">لم يبدأ</span>':'<span class="pill mute">منتهي</span>';
-    return '<div class="item"><div class="i-main"><b>'+esc(s.course)+'</b><div class="sub">'+(sess?'حصة بتاريخ '+fmtDate(s.start):'من '+fmtDate(s.start)+' إلى '+fmtDate(s.end)+' · '+esc(s.months||'')+' شهر')+'</div></div>'+
+    return '<div class="item"><div class="i-main"><b>'+esc(s.course)+'</b><div class="sub">'+(sess?'حصة بتاريخ '+fmtDate(s.start):'من '+fmtDate(s.start)+' إلى '+fmtDate(s.end)+' · '+esc(s.months||'')+' شهر')+(teacherName(s.teacherId)?' · '+esc(teacherName(s.teacherId)):'')+'</div>'+(s.discount>0?'<div class="sub t-ok">خصم '+esc(money(s.discount))+(s.discountPct?' ('+esc(s.discountPct)+'%)':'')+' — '+esc(s.discountReason||'')+(s.discountBy?' · '+esc(s.discountBy):'')+'</div>':'')+'</div>'+
       '<div class="i-nums"><span>الرسوم '+esc(money(s.fee))+'</span><span>المدفوع '+esc(money(s.paid))+'</span><span class="'+(s.remaining>0?'t-crit':'')+'">المتبقي '+esc(money(s.remaining))+'</span></div>'+
       '<div class="i-act">'+pill+'<button class="btn sm" type="button" data-act="receipt" data-sub="'+esc(s.id)+'">إيصال</button>'+(s.remaining>0?'<button class="btn sm" type="button" data-act="panel" data-panel="pay" data-sub="'+esc(s.id)+'">دفعة</button>':'')+
       '<button class="btn sm danger" type="button" data-act="del-sub" data-id="'+esc(s.id)+'">حذف</button></div></div>';
@@ -2396,7 +2524,7 @@ function renderDetail(){
   var subById={}; r.subs.forEach(function(s){subById[s.id]=s;});
   $('#d-pays').innerHTML=r.pays.length?r.pays.map(function(p){
     var s=subById[p.subId];
-    return '<div class="item"><div class="i-main"><b class="num">'+esc(mny(p.amount))+'</b><div class="sub">'+fmtDate(p.date)+(s?' · '+esc(s.course):'')+(p.note?' · '+esc(p.note):'')+'</div></div>'+
+    return '<div class="item"><div class="i-main"><b class="num">'+esc(mny(p.amount))+'</b><div class="sub">'+fmtDate(p.date)+(s?' · '+esc(s.course):'')+(p.method==='transfer'?' · <b>حوالة</b>':'')+(p.note?' · '+esc(p.note):'')+'</div></div>'+
       '<div class="i-act">'+(s?'<button class="btn sm" type="button" data-act="receipt" data-sub="'+esc(s.id)+'">إيصال</button>':'')+'<button class="btn sm danger" type="button" data-act="del-pay" data-id="'+esc(p.id)+'">حذف</button></div></div>';
   }).join(''):'<div class="sub">لا توجد دفعات بعد.</div>';
   renderDetailAtt(r);
@@ -2419,7 +2547,7 @@ function showPanel(name,subId,kind){
     var sel=$('#pay-sub');
     var target=subId||(r.subs.filter(function(s){return s.remaining>0;})[0]||r.subs[0]||{}).id;
     if(target) sel.value=target;
-    fillPayAmount(); $('#pay-date').value=fmtDate(todayStr()); $('#pay-note').value=''; $('#pay-err').textContent='';
+    fillPayAmount(); $('#pay-date').value=fmtDate(todayStr()); $('#pay-note').value=''; $('#pay-method').value='cash'; $('#pay-err').textContent='';
     $('#pay-amt').focus();
   }else if(name==='renew'){
     var today=D.today, ses=(kind==='session');
@@ -2428,7 +2556,7 @@ function showPanel(name,subId,kind){
     var lastEnd=monthly.reduce(function(m,s){return s.end>m?s.end:m;},'');
     var start=ses?today:(lastEnd&&lastEnd>=today?addDays(lastEnd,1):today);
     var mo=last?(last.months||1):1;
-    $('#rn-box').innerHTML=subFieldsHtml('rn',{kind:ses?'session':'month',course:last?last.course:'',start:start,months:mo,end:subEnd(start,mo),fee:(!ses&&last)?last.fee:''});
+    $('#rn-box').innerHTML=subFieldsHtml('rn',{kind:ses?'session':'month',course:last?last.course:'',start:start,months:mo,end:subEnd(start,mo),fee:(!ses&&last)?r3((Number(last.fee)||0)+(Number(last.discount)||0)):'',teacher:last?last.teacherId:''});
     $('#rn-err').textContent='';
     if(last&&!ses) $('#rn-box [data-f="fee"]').dataset.touched='1';
     if(ses) autoFee($('#rn-box .subfields'));
@@ -2463,7 +2591,7 @@ async function submitPay(){
   if(amt>s.remaining){ err.textContent='المبلغ أكبر من المتبقي على هذا الاشتراك ('+money(s.remaining)+').'; return; }
   btn.disabled=true; err.textContent='';
   try{
-    await S.db.collection('payments').doc().set({studentId:r.st.id,subId:s.id,amount:amt,date:date,note:$('#pay-note').value.trim(),at:Date.now()});
+    await S.db.collection('payments').doc().set({studentId:r.st.id,subId:s.id,amount:amt,date:date,note:$('#pay-note').value.trim(),method:$('#pay-method').value==='transfer'?'transfer':'cash',at:Date.now()});
     toast('تم تسجيل الدفعة'); showPanel('');
   }catch(e){ err.textContent='تعذر الحفظ: '+(e&&e.message?e.message:'خطأ غير معروف'); }
   btn.disabled=false;
@@ -2539,8 +2667,8 @@ async function exportCsv(name,rows){
 }
 function exportMonth(){
   var ym=curRepMonth(), subById={}; S.subs.forEach(function(s){subById[s.id]=s;});
-  var rows=[['التاريخ','الطالب','الدورة','المبلغ','ملاحظة']];
-  monthPayments(ym).forEach(function(p){ var r=D.byId[p.studentId], s=subById[p.subId]; rows.push([p.date,r?r.st.name:'',s?s.course:'',Number(p.amount)||0,p.note||'']); });
+  var rows=[['التاريخ','الطالب','الدورة','المبلغ','الطريقة','ملاحظة']];
+  monthPayments(ym).forEach(function(p){ var r=D.byId[p.studentId], s=subById[p.subId]; rows.push([p.date,r?r.st.name:'',s?s.course:'',Number(p.amount)||0,p.method==='transfer'?'حوالة':'نقداً',p.note||'']); });
   exportCsv('دفعات-'+ym+'.csv',rows);
 }
 function exportAll(){
@@ -2976,7 +3104,7 @@ function receiptModel(){
   var r=D.byId[S.rc.sid]; if(!r) return null;
   var s=r.subs.filter(function(x){ return x.id===S.rc.sub; })[0]; if(!s) return null;
   var pays=r.pays.filter(function(p){ return p.subId===s.id; }).slice().sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:((a.at||0)-(b.at||0))); });
-  return {no:receiptNo(s),center:S.settings.centerName,cur:S.settings.currency,name:r.st.name,course:s.course||'',session:s.kind==='session',start:s.start,end:s.end,months:s.months,fee:s.fee,paid:s.paid,remaining:s.remaining,pays:pays,today:todayStr()};
+  return {no:receiptNo(s),center:S.settings.centerName,cur:S.settings.currency,name:r.st.name,course:s.course||'',session:s.kind==='session',start:s.start,end:s.end,months:s.months,fee:s.fee,paid:s.paid,remaining:s.remaining,pays:pays,today:todayStr(),discount:Number(s.discount)||0,discountPct:s.discountPct||0,discountReason:s.discountReason||'',discountBy:s.discountBy||''};
 }
 function drawReceipt(m){
   var W=RC.W, SC=RC.SC, rows=Math.max(m.pays.length,1), H=Math.max(1560,706+rows*58+440);
@@ -3012,7 +3140,7 @@ function drawReceipt(m){
     var y=706+i*58;
     if(i%2){ c.fillStyle='#F7F9F8'; c.fillRect(M,y,W-2*M,58); }
     T(fmtDate(p.date),R-20,y+38,28,500,INK);
-    var note=p.note||''; if(note) T(note,R-250,y+38,fit(note,380,26,500),500,MU);
+    var note=(p.method==='transfer'?'حوالة · ':'')+(p.note||''); if(note) T(note,R-250,y+38,fit(note,380,26,500),500,MU);
     T(money(p.amount)+' '+m.cur,M+20,y+38,28,700,OK,'left');
   });
   var tEnd=706+rows*58; c.strokeStyle=LN; c.lineWidth=2; c.beginPath(); c.moveTo(M,tEnd); c.lineTo(R,tEnd); c.stroke();
@@ -3020,7 +3148,8 @@ function drawReceipt(m){
   var top=tEnd+36, tx=R-520;
   c.strokeStyle=LN; c.lineWidth=2; rr(tx,top,520,200,14); c.stroke();
   function line(label,val,y,col,px){ T(label,R-24,y,28,500,MU); T(val,tx+24,y,px||30,700,col,'left'); }
-  line('إجمالي الرسوم',money(m.fee)+' '+m.cur,top+56,INK);
+  line(m.discount>0?'الرسوم بعد الخصم':'إجمالي الرسوم',money(m.fee)+' '+m.cur,top+56,INK);
+  if(m.discount>0){ var dn='السعر الأصلي '+money(m.fee+m.discount)+' − خصم '+money(m.discount)+' '+m.cur+(m.discountPct?' ('+m.discountPct+'%)':'')+' · '+m.discountReason+(m.discountBy?' · '+m.discountBy:''); T(dn,R,top+246,fit(dn,W-2*M,26,500),500,MU); }
   line('المدفوع',money(m.paid)+' '+m.cur,top+112,OK);
   var rem=m.remaining, remTxt=rem>0?money(rem)+' '+m.cur:(rem<0?'زيادة '+money(-rem)+' '+m.cur:'0 '+m.cur);
   line(rem<0?'الرصيد':'المتبقي',remTxt,top+170,rem>0?CR:(rem<0?AC:OK),38);
@@ -3487,7 +3616,7 @@ async function boot(){
 }
 
 /* ===== extras (stage 1): repeated absence, WhatsApp / bulk reminders, global search, quick payment, phone bottom bar ===== */
-function isLive(r){ var k=r.status.key; return k==='active'||k==='soon'||k==='upcoming'; }
+function isLive(r){ var k=r.status.key; return (r.st.status||'active')==='active'&&(k==='active'||k==='soon'||k==='upcoming'); }
 function absentCalc(){
   var days=Object.keys(S.att||{}).sort().reverse();
   D.rows.forEach(function(r){
@@ -3582,7 +3711,7 @@ function openMore(){
   function visible(b){ return b&&getComputedStyle(b).display!=='none'; }
   function add(btn){ if(!btn||!visible(btn)) return; var lab=(btn.querySelector('span')||btn).textContent.trim(), s=btn.querySelector('svg'); rows.push({lab:lab,svg:s?s.outerHTML:'',el:btn}); }
   side.forEach(function(s){ add(document.querySelector('.nav .tab-btn[data-tab="'+s[0]+'"]')); });
-  ['noon-nav-log','noon-nav-money','noon-nav-trash','noon-nav-accounts'].forEach(function(id){ add(document.getElementById(id)); });
+  ['noon-nav-log','noon-nav-money','noon-nav-inq','noon-nav-trash','noon-nav-accounts'].forEach(function(id){ add(document.getElementById(id)); });
   var who=(document.getElementById('noon-who')||{}).textContent||'', st=(document.getElementById('saveState')||{}).textContent||'';
   var o=xModal('المزيد','<div class="more-who sub">'+esc(who)+(st?' · '+esc(st):'')+'</div><div class="more-list">'+rows.map(function(r,i){ return '<button type="button" class="more-item" data-xact="more-go" data-i="'+i+'">'+r.svg+'<span>'+esc(r.lab)+'</span></button>'; }).join('')+
     (document.getElementById('noon-logout')?'<button type="button" class="more-item out" data-xact="more-out"><span>تسجيل الخروج</span></button>':'')+'</div>');
@@ -3606,6 +3735,27 @@ document.addEventListener('click',function(e){
 });
 document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&document.getElementById('x-modal')) closeX(); });
 bindGlobalSearch(); buildBottomBar();
+
+
+/* ===== stage 3 helpers: teacher select + live discount preview in subscription forms ===== */
+function teacherFieldHtml(pre,o){
+  var ts=(window.NOON_TEACHERS||[]).filter(function(t){ return t.active||(o&&o.teacher===t.id); });
+  if(!ts.length) return '';
+  return '<div class="field"><label for="'+pre+'-teacher">المعلم</label><select id="'+pre+'-teacher" data-f="teacher"><option value="">غير محدد</option>'+
+    ts.map(function(t){ return '<option value="'+esc(t.id)+'"'+((o&&o.teacher===t.id)?' selected':'')+'>'+esc(t.name)+'</option>'; }).join('')+'</select></div>';
+}
+function teacherName(id){ var t=(window.NOON_TEACHERS||[]).filter(function(x){return x.id===id;})[0]; return t?t.name:''; }
+function discPreview(box){
+  var g=function(k){ var el=box.querySelector('[data-f="'+k+'"]'); return el?el.value.trim():''; };
+  var t=g('dtype'), dv=box.querySelector('[data-f="dval"]'), dis=box.querySelector('[data-dis]'), net=box.querySelector('[data-net]');
+  dv.disabled=!t; if(!t){ dv.value=''; }
+  dis.hidden=!t; var fee=parseAmt(g('fee')), n=parseAmt(g('dval'));
+  if(!t||isNaN(fee)||isNaN(n)||n<=0){ net.hidden=true; return; }
+  var d=t==='pct'?r3(fee*n/100):r3(n); if(d>fee) d=fee;
+  net.hidden=false; net.innerHTML='<div class="hint" style="margin:0">السعر '+esc(money(fee))+' − خصم '+esc(money(d))+' = <b>'+esc(money(r3(fee-d)))+' '+esc(S.settings.currency)+'</b> هو المبلغ المطلوب من الطالب.</div>';
+}
+document.addEventListener('input',function(e){ var t=e.target; if(t&&t.dataset&&(t.dataset.f==='fee'||t.dataset.f==='dval'||t.dataset.f==='dtype')){ var b=t.closest('.subfields'); if(b) discPreview(b); } });
+document.addEventListener('change',function(e){ var t=e.target; if(t&&t.dataset&&t.dataset.f==='dtype'){ var b=t.closest('.subfields'); if(b) discPreview(b); } });
 
 window.__app={buildBackup:buildBackup,downloadBackup:downloadBackup,buildPdf:buildPdf};
 boot();
