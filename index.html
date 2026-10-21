@@ -4605,7 +4605,7 @@ function openRefund(id){
     '<div class="kvs"><div class="kv"><span>الاشتراك</span><b>'+esc(s.course||'')+'</b></div><div class="kv"><span>الرسوم</span><b>'+esc(money(s.fee))+'</b></div><div class="kv"><span>المدفوع</span><b>'+esc(money(s.paid))+'</b></div></div>'+
     '<div class="fgrid">'+
     '<div class="field"><label>تاريخ الانسحاب</label><input id="rf-day" class="ltr dateinput" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off" value="'+esc(fmtDate(todayStr()))+'"></div>'+
-    (kind==='month'?'<div class="field"><label>احتساب الأيام</label><select id="rf-basis"><option value="all"'+(bag?' selected':'')+'>كل الأيام منذ البداية (حقيبة)</option><option value="att"'+(bag?'':' selected')+'>أيام الحضور المسجّلة فقط</option></select></div>':'')+
+    (kind==='month'?'<div class="field"><label>احتساب الأيام</label><select id="rf-basis"><option value="all"'+(bag?' selected':'')+'>كل الأيام منذ البداية (حقيبة)</option><option value="att"'+(bag?'':' selected')+'>أيام الحضور المسجّلة فقط</option><option value="s8">8 حصص في الشهر</option><option value="s12">12 حصة في الشهر</option></select></div>':'')+
     '<div class="field"><label>'+(kind==='month'?'عدد أيام الاشتراك':kind==='pack'?'عدد حصص الباقة':'عدد الحصص')+'</label><input id="rf-total" class="ltr" inputmode="numeric" readonly></div>'+
     '<div class="field"><label>'+(kind==='month'?'الأيام المحتسبة':'الحصص المستهلكة')+'</label><input id="rf-used" class="ltr" inputmode="numeric"></div>'+
     '</div>'+
@@ -4623,9 +4623,12 @@ function refundCalc(o,fresh){
   var day=parseDIn($('rf-day').value.trim()); if(!isDate(day)) day=todayStr();
   var total, used;
   if(kind==='month'){
-    total=Math.max(1,diffDays(s.end,s.start)+1);
-    var last=day<s.end?day:s.end, basis=($('rf-basis')||{}).value;
+    var last=day<s.end?day:s.end, basis=($('rf-basis')||{}).value, fixed=basis==='s8'?8:basis==='s12'?12:0;
+    total=fixed||Math.max(1,diffDays(s.end,s.start)+1);
     used=day<s.start?0:(basis==='all'?diffDays(last,s.start)+1:refundDaysPresent(row.st.id,s.start,last));
+    if(fixed) used=Math.min(fixed,used);
+    var lt=document.querySelector('#rf-total'), ll=lt&&lt.parentNode.querySelector('label'), lu=document.querySelector('#rf-used'), lul=lu&&lu.parentNode.querySelector('label');
+    if(ll) ll.textContent=fixed?'عدد حصص الشهر':'عدد أيام الاشتراك'; if(lul) lul.textContent=fixed?'الحصص التي حضرها':'الأيام المحتسبة';
   } else if(kind==='pack'){ total=Number(s.cap)||(Number(s.sessionsTotal)||0)+(Number(s.sessionsAdjust)||0)||1; used=Number(s.used)||0; }
   else { total=1; used=(row&&refundDaysPresent(row.st.id,s.start,s.start))?1:0; }
   $('rf-total').value=total;
@@ -4633,7 +4636,7 @@ function refundCalc(o,fresh){
   var u=Math.max(0,Math.min(total,Number(latinDigits($('rf-used').value))||0));
   var unit=s.fee/total, consumed=r3(Math.min(s.fee,unit*u)), back=Math.max(0,r3(s.paid-consumed));
   o.__calc={total:total,used:u,unit:unit,consumed:consumed,back:back};
-  $('rf-calc').innerHTML='<div class="kv"><span>سعر '+(kind==='month'?'اليوم':'الحصة')+'</span><b>'+esc(money(r3(unit)))+'</b></div><div class="kv"><span>ما استُهلك ('+u+' × '+esc(money(r3(unit)))+')</span><b>'+esc(money(consumed))+'</b></div><div class="kv"><span>المبلغ المستحق للإرجاع</span><b class="'+(back>0?'t-ok':'bad')+'">'+esc(money(back))+'</b></div>'+(s.paid<consumed?'<p class="hint bad">الطالب دفع أقل مما استهلك؛ لا يوجد مبلغ يُسترد (المتبقي عليه '+esc(money(r3(consumed-s.paid)))+').</p>':'');
+  $('rf-calc').innerHTML='<div class="kv"><span>سعر '+(kind==='month'&&!/^s(8|12)$/.test(($('rf-basis')||{}).value||'')?'اليوم':'الحصة')+'</span><b>'+esc(money(r3(unit)))+'</b></div><div class="kv"><span>ما استُهلك ('+u+' × '+esc(money(r3(unit)))+')</span><b>'+esc(money(consumed))+'</b></div><div class="kv"><span>المبلغ المستحق للإرجاع</span><b class="'+(back>0?'t-ok':'bad')+'">'+esc(money(back))+'</b></div>'+(s.paid<consumed?'<p class="hint bad">الطالب دفع أقل مما استهلك؛ لا يوجد مبلغ يُسترد (المتبقي عليه '+esc(money(r3(consumed-s.paid)))+').</p>':'');
   if(fresh||!o.__amtTouched) $('rf-amt').value=back>0?String(back):'';
 }
 document.addEventListener('input',function(e){
