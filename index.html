@@ -339,7 +339,7 @@ var MAP={
     doc:function(r){ var o={studentId:r.student_id,course:r.course,start:r.start_date,end:r.end_date,months:r.months,fee:Number(r.fee),at:Date.parse(r.created_at)||0}; if(r.kind==='session') o.kind='session'; if(r.kind==='pack'){ o.kind='pack'; o.sessionsTotal=r.sessions_total; o.sessionsAdjust=r.sessions_adjust||0; } if(Number(r.discount)>0){ o.discount=Number(r.discount); o.discountPct=r.discount_pct==null?null:Number(r.discount_pct); o.discountReason=r.discount_reason||''; o.discountBy=r.discount_by||''; } if(r.teacher_id) o.teacherId=r.teacher_id; if(r.subjects) o.subjects=r.subjects; return o; },
     row:function(d,full){ var o={}; if(full||'studentId' in d) o.student_id=d.studentId; if(full||'course' in d) o.course=d.course; if(full||'start' in d) o.start_date=d.start;
       if(full||'end' in d) o.end_date=d.end; if(full||'months' in d) o.months=d.months; if(full||'fee' in d) o.fee=d.fee; if(full||'kind' in d) o.kind=d.kind==='session'?'session':(d.kind==='pack'?'pack':'month');
-      if(full||'sessionsTotal' in d) o.sessions_total=d.kind==='pack'?Number(d.sessionsTotal):null; if(full||'sessionsAdjust' in d) o.sessions_adjust=Number(d.sessionsAdjust)||0;
+      if(full||'sessionsTotal' in d) o.sessions_total=(d.kind==='pack'||!full)?Number(d.sessionsTotal):null; if(full||'sessionsAdjust' in d) o.sessions_adjust=Number(d.sessionsAdjust)||0;
       if(full||'discount' in d){ o.discount=Number(d.discount)||0; o.discount_pct=d.discountPct||null; o.discount_reason=d.discountReason||''; }
       if(full||'teacherId' in d) o.teacher_id=d.teacherId||null; if(full||'subjects' in d) o.subjects=String(d.subjects||'').slice(0,200); return o; }},
   payments:{path:'payments',order:'created_at.asc,id.asc',
@@ -404,20 +404,21 @@ async function refreshTables(names){
 }
 var ALL=['students','subs','payments','attendance','settings'];
 /* ---------- class sessions (packs): marks, group links, cancelled sessions ---------- */
-window.NOON_SM=[]; window.NOON_SG=[]; window.NOON_OFF=[]; var smSig='';
+window.NOON_SM=[]; window.NOON_SG=[]; window.NOON_OFF=[]; window.NOON_TS=[]; var smSig='';
 function addDays(d,n){ var t=new Date(d+'T00:00:00Z'); t.setUTCDate(t.getUTCDate()+n); return t.toISOString().slice(0,10); }
 async function loadSessions(){
   try{
     var since=addDays(new Date().toISOString().slice(0,10),-200);
     var m=await fetchAll('/rest/v1/session_marks?select=day,group_id,student_id,mark&day=gte.'+since+'&order=day.asc,group_id.asc,student_id.asc');
     var g=await fetchAll('/rest/v1/subscription_groups?select=sub_id,group_id&order=sub_id.asc,group_id.asc');
-    var o=await fetchAll('/rest/v1/group_off?select=group_id,day,note&day=gte.'+since+'&order=day.asc,group_id.asc');
-    var sig=JSON.stringify([m,g,o]);
-    window.NOON_SM=m; window.NOON_SG=g; window.NOON_OFF=o;
+    var o=await fetchAll('/rest/v1/group_off?select=group_id,day,note,moved_to,moved_t&or=(day.gte.'+since+',moved_to.gte.'+since+')&order=day.asc,group_id.asc');
+    var t=await fetchAll('/rest/v1/teacher_sessions?select=day,group_id,teacher_id,status&day=gte.'+since+'&order=day.asc,group_id.asc');
+    var sig=JSON.stringify([m,g,o,t]);
+    window.NOON_SM=m; window.NOON_SG=g; window.NOON_OFF=o; window.NOON_TS=t;
     if(sig!==smSig){ smSig=sig; if(window.NOON_REDRAW) window.NOON_REDRAW(); }
   }catch(e){}
 }
-window.NOON_API={http:function(a,b,c){return http(a,b,c);},guarded:function(w,n,f){return guarded(w,n,f);},reloadSessions:loadSessions,addDays:addDays};
+window.NOON_API={isClosed:async function(day){ try{ var r=await http('GET','/rest/v1/cash_closings?select=day&day=eq.'+encodeURIComponent(day)); return Array.isArray(r.data)&&r.data.length>0; }catch(e){ return false; } },http:function(a,b,c){return http(a,b,c);},guarded:function(w,n,f){return guarded(w,n,f);},reloadSessions:loadSessions,addDays:addDays};
 
 /* ---------- sync (periodic check + immediate refresh after own writes) ---------- */
 async function readMarker(){ var r=await http('POST','/rest/v1/rpc/change_marker',{body:{}}); return r.data; }
@@ -602,7 +603,7 @@ function openImport(source,label){
     if(ownerPart){
       var orep=null; try{ orep=await rpc('owner_import',{p:ownerPart,p_dry:true}); }catch(e){ orep={ok:false,errors:[friendly(e).message]}; }
       if(!orep.ok){ h+='<p class="bad"><b>جداول المالك في الملف:</b> '+esc((orep.errors||[]).join(' '))+'</p>'; }
-      else{ var OL={employees:'الموظفون',employee_salaries:'رواتب الموظفين',advances:'السلف',salary_payments:'دفع الرواتب',expenses:'المصروفات',teachers:'المعلمون',teacher_terms:'أجور المعلمين',teacher_payments:'دفعات المعلمين',inquiries:'الاستفسارات',groups:'المجموعات',price_list:'قائمة الأسعار',cash_closings:'إقفال الصندوق'};
+      else{ var OL={partners:'الشركاء',partner_draws:'سحوبات الشركاء',employees:'الموظفون',employee_salaries:'رواتب الموظفين',advances:'السلف',salary_payments:'دفع الرواتب',expenses:'المصروفات',teachers:'المعلمون',teacher_terms:'أجور المعلمين',teacher_payments:'دفعات المعلمين',inquiries:'الاستفسارات',groups:'المجموعات',price_list:'قائمة الأسعار',cash_closings:'إقفال الصندوق'};
         h+='<p class="sub"><b>جداول المالك في الملف (تُدمج: يُضاف الناقص فقط ولا يُستبدل شيء، في كل الأوضاع):</b></p><table class="imp"><thead><tr><th></th><th>في الملف</th><th>جديد</th></tr></thead><tbody>'+Object.keys(OL).map(function(k){ var o=orep.counts[k]||{file:0,new:0}; return '<tr><td>'+OL[k]+'</td><td>'+o.file+'</td><td>'+o['new']+'</td></tr>'; }).join('')+'</tbody></table>'; }
     }
     if(rep.already_imported_file) h+='<p class="warn">هذا الملف سبق استيراده. الدمج لن يكرر أي سجل.</p>';
@@ -655,8 +656,8 @@ function openImport(source,label){
 
 /* ---------- activity log page ---------- */
 var OPS={INSERT:'إضافة',UPDATE:'تعديل',DELETE:'حذف',EXPORT:'تصدير',IMPORT:'استيراد',RESTORE:'استعادة',LOGIN:'دخول',LOGOUT:'خروج',ADMIN:'إجراء إداري'};
-var SECS={students:'الطلاب',subscriptions:'الاشتراكات',payments:'الدفعات',attendance:'الحضور',settings:'الإعدادات',system:'النظام',accounts:'الحسابات',expenses:'المصروفات',employees:'الموظفون',employee_salaries:'رواتب الموظفين',advances:'السلف',salary_payments:'دفع الرواتب',teachers:'المعلمون',teacher_terms:'أجور المعلمين',teacher_payments:'دفعات المعلمين',inquiries:'الاستفسارات',groups:'المجموعات',price_list:'قائمة الأسعار',cash_closings:'إقفال الصندوق',subscription_groups:'مجموعات الباقة',session_marks:'حضور الحصص',group_off:'حصص مؤجلة',trash:'سلة المحذوفات'};
-var FIELDS={name:'الاسم',phone:'الهاتف',guardian:'ولي الأمر',guardian_phone:'هاتف ولي الأمر',notes:'ملاحظات',joined:'تاريخ الانضمام',course:'الدورة',start_date:'البداية',end_date:'النهاية',months:'الأشهر',fee:'الرسوم',kind:'النوع',amount:'المبلغ',paid_on:'تاريخ الدفع',note:'ملاحظة',mark:'العلامة',day:'اليوم',data:'الإعدادات',student_id:'الطالب',sub_id:'الاشتراك',category:'التصنيف',description:'البيان',on_date:'التاريخ',employee_id:'الموظف',period_start:'بداية الفترة',start_day:'يوم بداية الشهر',active:'يعمل',from_date:'يسري من',email:'البريد',role:'الصلاحية',status:'الحالة',method:'طريقة الدفع',discount:'الخصم',discount_pct:'نسبة الخصم',discount_reason:'سبب الخصم',discount_by:'بواسطة',subjects:'المواد',grade:'الصف',subject:'المادة',slots:'مواعيد الحصص',plan:'الخطة',price:'السعر',teacher_id:'المعلم',pay_type:'نوع الأجر',rate:'القيمة',interest:'الاهتمام',follow_up:'موعد المتابعة',created_by:'سجّله',sessions_total:'عدد الحصص',sessions_adjust:'تعديل الرصيد',group_id:'المجموعة'};
+var SECS={students:'الطلاب',subscriptions:'الاشتراكات',payments:'الدفعات',attendance:'الحضور',settings:'الإعدادات',system:'النظام',accounts:'الحسابات',expenses:'المصروفات',employees:'الموظفون',employee_salaries:'رواتب الموظفين',advances:'السلف',salary_payments:'دفع الرواتب',teachers:'المعلمون',teacher_terms:'أجور المعلمين',teacher_payments:'دفعات المعلمين',inquiries:'الاستفسارات',groups:'المجموعات',price_list:'قائمة الأسعار',cash_closings:'إقفال الصندوق',subscription_groups:'مجموعات الباقة',session_marks:'حضور الحصص',group_off:'حصص مؤجلة',teacher_sessions:'حضور المعلمين',partners:'الشركاء',partner_draws:'سحوبات الشركاء',partner_settings:'إعدادات الشركاء',trash:'سلة المحذوفات'};
+var FIELDS={name:'الاسم',phone:'الهاتف',guardian:'ولي الأمر',guardian_phone:'هاتف ولي الأمر',notes:'ملاحظات',joined:'تاريخ الانضمام',course:'الدورة',start_date:'البداية',end_date:'النهاية',months:'الأشهر',fee:'الرسوم',kind:'النوع',amount:'المبلغ',paid_on:'تاريخ الدفع',note:'ملاحظة',mark:'العلامة',day:'اليوم',data:'الإعدادات',student_id:'الطالب',sub_id:'الاشتراك',category:'التصنيف',description:'البيان',on_date:'التاريخ',employee_id:'الموظف',period_start:'بداية الفترة',start_day:'يوم بداية الشهر',active:'يعمل',from_date:'يسري من',email:'البريد',role:'الصلاحية',status:'الحالة',method:'طريقة الدفع',discount:'الخصم',discount_pct:'نسبة الخصم',discount_reason:'سبب الخصم',discount_by:'بواسطة',subjects:'المواد',grade:'الصف',subject:'المادة',slots:'مواعيد الحصص',plan:'الخطة',price:'السعر',teacher_id:'المعلم',pay_type:'نوع الأجر',rate:'القيمة',interest:'الاهتمام',follow_up:'موعد المتابعة',created_by:'سجّله',sessions_total:'عدد الحصص',sessions_adjust:'تعديل الرصيد',group_id:'المجموعة',moved_to:'أُجّلت إلى',moved_t:'وقت التعويض',partner_id:'الشريك',drawn_on:'تاريخ السحب',reserve_pct:'الاحتياطي %'};
 function studentName(id){ var s=cache.students.filter(function(x){return x.id===id;})[0]; return s?s.name:null; }
 function fieldVal(k,v){
   if(v==null||v==='') return '—';
@@ -668,9 +669,10 @@ function fieldVal(k,v){
   if(k==='employee_id') return empNames[v]||'(موظف)';
   if(k==='role') return v==='owner'?'مالك':'موظف';
   if(k==='active') return v?'نعم':'لا';
-  if(k==='status') return ({active:'نشط',paused:'موقوف مؤقتاً',withdrawn:'منسحب','new':'جديد',contacted:'تم التواصل',enrolled:'سجّل',lost:'لم يسجّل'})[v]||String(v);
+  if(k==='partner_id'){ return 'شريك'; }
+  if(k==='status') return ({present:'حضر',absent:'غاب',active:'نشط',paused:'موقوف مؤقتاً',withdrawn:'منسحب','new':'جديد',contacted:'تم التواصل',enrolled:'سجّل',lost:'لم يسجّل'})[v]||String(v);
   if(k==='method') return v==='transfer'?'حوالة':'نقداً';
-  if(k==='pay_type') return v==='percent'?'نسبة مئوية':'مبلغ ثابت';
+  if(k==='pay_type') return v==='percent'?'نسبة مئوية':(v==='session'?'مبلغ لكل حصة':'مبلغ ثابت');
   if(k==='teacher_id') return teacherName(v)||'(معلم)';
   if(k==='grade') return (window.NOON_GRADES||[])[v-1]||String(v);
   if(k==='slots'){ try{ var a=typeof v==='string'?JSON.parse(v):v; return a.length+' حصة أسبوعياً'; }catch(e){ return String(v); } }
@@ -851,6 +853,41 @@ function openAccounts(){
 function profileId(){ return session&&session.user_id; }
 
 /* ===== timetable, groups and the price list (everyone reads; the owner edits) ===== */
+/* ===== teacher clash detection: regular timetable + make-up sessions ===== */
+function tMin(t){ return (+t.slice(0,2))*60+(+t.slice(3,5)); }
+function tOverlap(a0,al,b0,bl){ return a0<b0+bl&&b0<a0+al; }
+function gLabel(g){ return ((window.NOON_GRADES||[])[g.grade-1]||'')+' — '+g.subject; }
+var DAYS_AR=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+/* sessions that really take place on `day` (postponed ones removed, make-ups added) */
+function sessionsOn(day){
+  var wd=new Date(day+'T00:00:00Z').getUTCDay(), out=[], offs=window.NOON_OFF||[], gs=window.NOON_GROUPS||[];
+  gs.forEach(function(g){ if(!g.active) return; if(offs.some(function(o){ return o.group_id===g.id&&o.day===day; })) return; (g.slots||[]).forEach(function(s){ if(s.d===wd) out.push({g:g,t:s.t,m:s.m,makeup:false}); }); });
+  offs.forEach(function(o){ if(o.moved_to!==day) return; var g=gs.filter(function(x){return x.id===o.group_id;})[0]; if(!g) return;
+    var ow=new Date(o.day+'T00:00:00Z').getUTCDay(), os=(g.slots||[]).filter(function(s){return s.d===ow;})[0]; if(os) out.push({g:g,t:o.moved_t||os.t,m:os.m,makeup:true}); });
+  return out;
+}
+/* make-up (or one-off) session of teacher `tid` on `day` at `t` for `m` minutes: list the sessions it collides with */
+window.NOON_CLASH=function(tid,day,t,m){
+  if(!tid) return [];
+  return sessionsOn(day).filter(function(x){ return x.g.teacher_id===tid&&tOverlap(tMin(t),Number(m),tMin(x.t),Number(x.m)); }).map(function(x){ return gLabel(x.g)+' ('+x.t+(x.makeup?'، تعويضية':'')+')'; });
+};
+/* the regular weekly slots of a group about to be saved against the other groups of the same teacher */
+function clashRegular(tid,slots,excludeId){
+  if(!tid) return [];
+  var out=[];
+  (window.NOON_GROUPS||[]).forEach(function(g){ if(g.id===excludeId||!g.active||g.teacher_id!==tid) return;
+    (g.slots||[]).forEach(function(o){ slots.forEach(function(s){ if(o.d===s.d&&tOverlap(tMin(s.t),Number(s.m),tMin(o.t),Number(o.m))) out.push(DAYS_AR[s.d]+' '+s.t+' يتعارض مع «'+gLabel(g)+'» '+o.t); }); }); });
+  return out;
+}
+/* a warning that can be overridden only by confirming twice */
+function clashGate(f,btn,lines){
+  if(!lines.length) return true;
+  var sig=lines.join('|'); if(f.__sig!==sig){ f.__sig=sig; f.__n=0; }
+  if(f.__n>=2) return true;
+  f.__n++; btn.textContent=f.__n===1?'حفظ رغم التعارض (1/2)':'تأكيد نهائي (2/2)'; return false;
+}
+window.NOON_CLASHGATE=clashGate;
+window.NOON_SESSIONS_ON=sessionsOn;
 function openTimetable(){
   var owner=window.CLOUD.role==='owner';
   var sh=modalShell('الجدول والأسعار',true), bd=sh.bd, tab='week', gf='', msg='', msgCls='', editing=null, c=cur();
@@ -909,7 +946,9 @@ function openTimetable(){
         var seen={}; for(var i=0;i<slots.length;i++){ var k=slots[i].d+slots[i].t; if(seen[k]){ say('موعدان متطابقان في المجموعة نفسها.','bad'); return; } seen[k]=1; }
         var row={grade:+f.grade.value,subject:f.subject.value.trim(),teacher_id:f.teacher.value||null,active:f.act.value==='1',note:f.note.value.trim(),slots:slots};
         if(!row.grade||!row.subject){ say('اختر الصف واكتب المادة.','bad'); return; }
-        var btn=f.querySelector('.primary'); btn.disabled=true;
+        var btn=f.querySelector('.primary'), cl=row.active?clashRegular(row.teacher_id,slots,g?g.id:sid):[];
+        if(!clashGate(f,btn,cl)){ say('تعارض في مواعيد المعلم: '+cl.join(' | ')+'. '+(f.__n===1?'اضغط الزر مرة أخرى للمتابعة رغم التعارض.':'اضغط مرة أخيرة للتأكيد النهائي.'),'bad'); return; }
+        btn.disabled=true;
         try{ if(g) await w('PATCH','/rest/v1/groups?id=eq.'+g.id,row); else { try{ await w('POST','/rest/v1/groups',Object.assign({id:sid},row)); }catch(er){ if(er.code!=='23505') throw er; } }
           await loadPlan(); msg=g?'تم حفظ المجموعة.':'أُضيفت المجموعة.'; msgCls='ok'; render(); }catch(e){ say(adminErr(e),'bad'); btn.disabled=false; } };
       box.scrollIntoView({block:'nearest'});
@@ -1016,11 +1055,11 @@ function openMoney(){
     return {sal:s,adv:adv,advSum:advSum,remaining:s==null?null:s-advSum,paid:paid};
   }
   function render(){
-    var head='<div class="tabs"><button type="button" data-t="sum"'+(tab==='sum'?' class="on"':'')+'>ملخص الشهر</button><button type="button" data-t="day"'+(tab==='day'?' class="on"':'')+'>الدخل اليومي</button><button type="button" data-t="exp"'+(tab==='exp'?' class="on"':'')+'>المصروفات</button><button type="button" data-t="emp"'+(tab==='emp'?' class="on"':'')+'>الموظفون والرواتب</button><button type="button" data-t="fin"'+(tab==='fin'?' class="on"':'')+'>اللوحة المالية</button><button type="button" data-t="cash"'+(tab==='cash'?' class="on"':'')+'>إقفال الصندوق</button><button type="button" data-t="tch"'+(tab==='tch'?' class="on"':'')+'>المعلمون</button></div><div id="mn-msg" class="sub '+msgCls+'">'+esc(msg)+'</div>';
+    var head='<div class="tabs"><button type="button" data-t="sum"'+(tab==='sum'?' class="on"':'')+'>ملخص الشهر</button><button type="button" data-t="day"'+(tab==='day'?' class="on"':'')+'>الدخل اليومي</button><button type="button" data-t="exp"'+(tab==='exp'?' class="on"':'')+'>المصروفات</button><button type="button" data-t="emp"'+(tab==='emp'?' class="on"':'')+'>الموظفون والرواتب</button><button type="button" data-t="fin"'+(tab==='fin'?' class="on"':'')+'>اللوحة المالية</button><button type="button" data-t="cash"'+(tab==='cash'?' class="on"':'')+'>إقفال الصندوق</button><button type="button" data-t="tch"'+(tab==='tch'?' class="on"':'')+'>المعلمون</button><button type="button" data-t="par"'+(tab==='par'?' class="on"':'')+'>الشركاء</button></div><div id="mn-msg" class="sub '+msgCls+'">'+esc(msg)+'</div>';
     bd.innerHTML=head+'<div id="mn-body"></div>';
     bd.querySelectorAll('.tabs button').forEach(function(b){ b.onclick=function(){ tab=b.dataset.t; msg=''; render(); }; });
     var body=bd.querySelector('#mn-body');
-    if(tab==='sum') renderSum(body); else if(tab==='day') renderDay(body); else if(tab==='exp') renderExp(body); else if(tab==='fin') renderFin(body); else if(tab==='cash') renderCash(body); else if(tab==='tch') renderTeachers(body); else renderEmp(body);
+    if(tab==='sum') renderSum(body); else if(tab==='day') renderDay(body); else if(tab==='exp') renderExp(body); else if(tab==='fin') renderFin(body); else if(tab==='cash') renderCash(body); else if(tab==='tch') renderTeachers(body); else if(tab==='par') renderPartners(body); else renderEmp(body);
   }
   function monthPicker(){ return '<label class="mp">الشهر <input data-fmt="month" inputmode="numeric" maxlength="7" placeholder="YYYY-MM" autocomplete="off" dir="ltr" id="mn-month" value="'+esc(month)+'"></label>'; }
   function bindMonth(body){ body.querySelector('#mn-month').onchange=function(){ if(/^\d{4}-(0[1-9]|1[0-2])$/.test(this.value)){ month=this.value; render(); } else say('اكتب الشهر هكذا: 2026-10','bad'); }; }
@@ -1182,24 +1221,68 @@ function openMoney(){
     var d=await window.claude.use('downloads'); await d.save({filename:'noon-report-'+m+'.pdf',data:pdf});
   }
 
+  async function renderPartners(body){
+    body.innerHTML='جارٍ التحميل…'; var c=cur(), sm, dr;
+    try{ sm=await rpc('partners_summary',{}); dr=await fetchAll('/rest/v1/partner_draws?select=*&order=drawn_on.desc,created_at.desc'); }catch(e){ body.innerHTML='<div class="bad">'+esc(adminErr(e))+'</div>'; return; }
+    var pn=function(id){ var p=sm.partners.filter(function(x){return x.id===id;})[0]; return p?p.name:'(شريك)'; };
+    body.innerHTML='<p class="sub" style="margin-top:0">الفائض = كل ما دُفع من الطلاب منذ تاريخ البداية − (المصروفات والإيجار + السلف + رواتب الموظفين + دفعات المعلمين). تبقى نسبة احتياطي في رصيد المركز، والباقي يُقسَّم بالتساوي بين الشركاء الفعّالين. كل مبلغ يأخذه شريك يُسجَّل كسحب فيُخصم من رصيده.</p>'+
+      '<div class="cards"><div class="card"><span class="l">المحصّل منذ '+esc(sm.start)+'</span><b class="t-ok">'+n2(sm.income)+' <small>'+esc(c)+'</small></b></div>'+
+      '<div class="card"><span class="l">الالتزامات المدفوعة</span><b>'+n2(sm.outflow)+' <small>'+esc(c)+'</small></b></div>'+
+      '<div class="card big"><span class="l">الفائض (الصافي)</span><b class="'+(Number(sm.net)<0?'bad':'t-ok')+'">'+n2(sm.net)+' <small>'+esc(c)+'</small></b></div>'+
+      '<div class="card"><span class="l">احتياطي المركز ('+n2(sm.reservePct)+'%)</span><b>'+n2(sm.reserve)+' <small>'+esc(c)+'</small></b></div>'+
+      '<div class="card"><span class="l">القابل للتوزيع</span><b>'+n2(sm.distributable)+' <small>'+esc(c)+'</small></b></div>'+
+      '<div class="card"><span class="l">نصيب كل شريك</span><b>'+n2(sm.share)+' <small>'+esc(c)+'</small></b></div></div>'+
+      '<div class="row wrap" style="margin:0 0 10px"><button class="btn sm" type="button" id="pr-set">إعدادات الحساب</button></div><div id="pr-form"></div>'+
+      '<table class="imp"><thead><tr><th>الشريك</th><th>النصيب</th><th>المسحوب</th><th>الرصيد المتاح</th><th></th></tr></thead><tbody>'+sm.partners.map(function(p){ return '<tr data-id="'+esc(p.id)+'"><td><b>'+esc(p.name)+'</b>'+(p.active?'':' <small>(غير فعّال)</small>')+'</td><td class="n">'+n2(p.share)+'</td><td class="n">'+n2(p.drawn)+'</td><td class="n '+(Number(p.balance)<0?'bad':'t-ok')+'"><b>'+n2(p.balance)+'</b></td><td class="nw"><button class="btn sm primary pr-draw" type="button">سحب</button> <button class="btn sm pr-edit" type="button">تعديل</button></td></tr>'; }).join('')+'</tbody></table>'+
+      (Number(sm.net)<0?'<p class="bad">الصافي سالب: الالتزامات أكبر من المحصّل منذ تاريخ البداية، فلا يوجد فائض للتوزيع.</p>':'')+
+      '<h3 class="sec">الأشهر</h3><table class="imp"><thead><tr><th>الشهر</th><th>المحصّل</th><th>الالتزامات</th><th>الصافي</th></tr></thead><tbody>'+(sm.months.length?sm.months.map(function(m){ return '<tr><td dir="ltr">'+esc(m.month)+'</td><td class="n">'+n2(m.income)+'</td><td class="n">'+n2(m.outflow)+'</td><td class="n '+(Number(m.net)<0?'bad':'')+'">'+n2(m.net)+'</td></tr>'; }).join(''):'<tr><td colspan="4" class="empty">لا حركة منذ تاريخ البداية.</td></tr>')+'</tbody></table>'+
+      '<h3 class="sec">سجل السحوبات</h3><table class="imp"><tbody>'+(dr.length?dr.map(function(x){ return '<tr><td dir="ltr">'+esc(x.drawn_on)+'</td><td>'+esc(pn(x.partner_id))+'</td><td class="n">'+n2(x.amount)+'</td><td>'+esc(x.note||'')+'</td><td><button class="btn sm pr-rm" data-id="'+esc(x.id)+'" type="button">حذف</button></td></tr>'; }).join(''):'<tr><td class="empty">لا سحوبات.</td></tr>')+'</tbody></table>';
+    var box=body.querySelector('#pr-form');
+    body.querySelector('#pr-set').onclick=function(){
+      frm(box,'<label>تاريخ بداية الحساب<input name="sd" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="YYYY-MM-DD" autocomplete="off" required dir="ltr" value="'+esc(sm.start)+'"></label><label>احتياطي المركز %<input name="rp" data-fmt="num" inputmode="decimal" autocomplete="off" required dir="ltr" value="'+esc(sm.reservePct)+'"></label>',
+        async function(f){ var rp=Number(f.rp.value); if(!okDate(f.sd.value)||!(rp>=0&&rp<=100)) throw lerr('تحقق من التاريخ ونسبة الاحتياطي (0 إلى 100).'); await w('PATCH','/rest/v1/partner_settings?id=eq.1',{start_date:f.sd.value,reserve_pct:rp,updated_at:new Date().toISOString()}); },'تم حفظ الإعدادات.');
+    };
+    body.querySelectorAll('tr[data-id]').forEach(function(tr){
+      var p=sm.partners.filter(function(x){return x.id===tr.dataset.id;})[0];
+      tr.querySelector('.pr-draw').onclick=function(){
+        frm(box,'<label>الشريك<input disabled value="'+esc(p.name)+'"></label><label>المبلغ<input name="a" data-fmt="num" inputmode="decimal" autocomplete="off" required dir="ltr" value="'+esc(Math.max(0,Number(p.balance)))+'"></label><label>التاريخ<input name="d" data-fmt="date" inputmode="numeric" maxlength="10" autocomplete="off" required dir="ltr" value="'+esc(today())+'"></label><label class="grow">ملاحظة<input name="n" maxlength="200"></label>',
+          async function(f,sid){ var a=Number(f.a.value); if(!(a>0)||!okDate(f.d.value)) throw lerr('أدخل مبلغاً وتاريخاً صحيحين.');
+            if(a>Number(p.balance)&&!confirm('المبلغ أكبر من رصيد '+p.name+' المتاح ('+n2(p.balance)+'). متابعة؟')) throw lerr('لم يُسجَّل السحب.');
+            try{ await w('POST','/rest/v1/partner_draws',{id:sid,partner_id:p.id,amount:a,drawn_on:f.d.value,note:f.n.value.trim()}); }catch(er){ if(er.code!=='23505') throw er; } },'سُجّل السحب.');
+        box.scrollIntoView({block:'nearest'}); };
+      tr.querySelector('.pr-edit').onclick=function(){
+        frm(box,'<label>الاسم<input name="name" required maxlength="60" value="'+esc(p.name)+'"></label><label>الحالة<select name="act"><option value="1"'+(p.active?' selected':'')+'>فعّال (يدخل في التقسيم)</option><option value="0"'+(p.active?'':' selected')+'>غير فعّال</option></select></label>',
+          async function(f){ if(!f.name.value.trim()) throw lerr('اكتب الاسم.'); await w('PATCH','/rest/v1/partners?id=eq.'+p.id,{name:f.name.value.trim(),active:f.act.value==='1'}); },'تم الحفظ.');
+        box.scrollIntoView({block:'nearest'}); };
+    });
+    body.querySelectorAll('.pr-rm').forEach(function(b){ b.onclick=async function(){ if(!confirm('حذف هذا السحب؟ سيعود المبلغ إلى رصيد الشريك.')) return; try{ await w('DELETE','/rest/v1/partner_draws?id=eq.'+b.dataset.id); if(await load()){ msg='تم حذف السحب.'; msgCls='ok'; render(); } }catch(e){ say(adminErr(e),'bad'); } }; });
+  }
   async function renderTeachers(body){
     body.innerHTML='جارٍ التحميل…'; var c=cur(), m0=month+'-01', dues;
-    try{ dues=await rpc('teacher_dues',{p_month:m0}); }catch(e){ body.innerHTML='<div class="bad">'+esc(adminErr(e))+'</div>'; return; }
+    var tsRows=[];
+    try{ dues=await rpc('teacher_dues',{p_month:m0}); var mr=monthRange(month); tsRows=await fetchAll('/rest/v1/teacher_sessions?select=*&day=gte.'+mr[0]+'&day=lte.'+mr[1]+'&order=day.asc'); }catch(e){ body.innerHTML='<div class="bad">'+esc(adminErr(e))+'</div>'; return; }
     var tn=function(id){ var t=D.teachers.filter(function(x){return x.id===id;})[0]; return t?t.name:'(معلم)'; };
     var html=monthPicker()+'<div class="row" style="margin:0 0 10px"><button class="btn sm primary" type="button" id="th-new">إضافة معلم</button></div><div id="th-form"></div>'+
-      '<p class="sub" style="margin-top:0">المستحق للمعلم: إما نسبة من المبالغ التي دفعها طلاب اشتراكاته خلال الشهر، أو مبلغ ثابت شهري. اربط كل اشتراك بمعلمه عند تسجيل الاشتراك. تُحسب النسبة على ما دُفع فعلاً (بعد الخصم).</p>'+
-      '<table class="imp"><thead><tr><th>المعلم</th><th>الأجر</th><th>محصّل من طلابه</th><th>المستحق</th><th>المدفوع</th><th>المتبقي</th><th></th></tr></thead><tbody>'+
-      (dues.length?dues.map(function(x){ return '<tr data-id="'+esc(x.teacher_id)+'"><td><b>'+esc(x.name)+'</b>'+(x.active?'':' <small>(متوقف)</small>')+'</td><td>'+(x.pay_type==='percent'?n2(x.rate)+'%':(x.pay_type==='fixed'?'ثابت '+n2(x.rate):'<span class="bad">غير محدد</span>'))+'</td><td class="n">'+(x.pay_type==='percent'?n2(x.base):'—')+'</td><td class="n">'+n2(x.due)+'</td><td class="n t-ok">'+n2(x.paid)+'</td><td class="n '+(Number(x.remaining)>0?'warn':'')+'"><b>'+n2(x.remaining)+'</b></td><td class="nw"><button class="btn sm primary th-pay" type="button"'+(Number(x.remaining)>0?'':' disabled')+'>دفع</button> <button class="btn sm th-edit" type="button">تعديل</button></td></tr>'; }).join(''):'<tr><td colspan="7" class="empty">لا يوجد معلمون بعد.</td></tr>')+'</tbody></table>'+
+      '<p class="sub" style="margin-top:0">المستحق للمعلم: نسبة من المبالغ التي دفعها طلاب اشتراكاته خلال الشهر، أو مبلغ ثابت شهري، أو مبلغ لكل حصة (يُحسب من حضوره المسجَّل في «حصص اليوم»). اربط كل اشتراك بمعلمه عند تسجيل الاشتراك. تُحسب النسبة على ما دُفع فعلاً (بعد الخصم).</p>'+
+      '<table class="imp"><thead><tr><th>المعلم</th><th>الأجر</th><th>محصّل من طلابه / عدد الحصص</th><th>المستحق</th><th>المدفوع</th><th>المتبقي</th><th></th></tr></thead><tbody>'+
+      (dues.length?dues.map(function(x){ return '<tr data-id="'+esc(x.teacher_id)+'"><td><b>'+esc(x.name)+'</b>'+(x.active?'':' <small>(متوقف)</small>')+'</td><td>'+(x.pay_type==='percent'?n2(x.rate)+'%':(x.pay_type==='fixed'?'ثابت '+n2(x.rate):(x.pay_type==='session'?n2(x.rate)+' للحصة':'<span class="bad">غير محدد</span>')))+'</td><td class="n">'+(x.pay_type==='percent'?n2(x.base):(x.pay_type==='session'?n2(x.base)+' حصة':'—'))+'</td><td class="n">'+n2(x.due)+'</td><td class="n t-ok">'+n2(x.paid)+'</td><td class="n '+(Number(x.remaining)>0?'warn':'')+'"><b>'+n2(x.remaining)+'</b></td><td class="nw"><button class="btn sm primary th-pay" type="button"'+(Number(x.remaining)>0?'':' disabled')+'>دفع</button> <button class="btn sm th-edit" type="button">تعديل</button></td></tr>'; }).join(''):'<tr><td colspan="7" class="empty">لا يوجد معلمون بعد.</td></tr>')+'</tbody></table>'+
       '<h3 class="sec">دفعات هذا الشهر</h3><table class="imp"><tbody>'+
       (function(){ var a=monthRange(month), l=D.tpays.filter(function(x){return inRange(x.paid_on,a[0],a[1]);}); return l.length?l.map(function(x){ return '<tr><td dir="ltr">'+esc(x.paid_on)+'</td><td>'+esc(tn(x.teacher_id))+'</td><td class="n">'+n2(x.amount)+'</td><td>'+esc(x.note||'')+'</td><td><button class="btn sm th-rm" data-id="'+esc(x.id)+'" type="button">حذف</button></td></tr>'; }).join(''):'<tr><td class="empty">لا دفعات.</td></tr>'; })()+'</tbody></table>';
-    body.innerHTML=html+'<div class="sub '+msgCls+'">'+esc(msg)+'</div>'; bindMonth(body);
+    var attHtml=(function(){
+      var by={}; tsRows.forEach(function(x){ var e=by[x.teacher_id]=by[x.teacher_id]||{p:[],a:[]}; (x.status==='present'?e.p:e.a).push(x); });
+      var gl=function(id){ var g=(window.NOON_GROUPS||[]).filter(function(y){return y.id===id;})[0]; return g?((window.NOON_GRADES||[])[g.grade-1]||'')+' '+g.subject:'(مجموعة)'; };
+      var ids=Object.keys(by);
+      return '<h3 class="sec">حضور المعلمين في هذا الشهر</h3>'+(ids.length?'<table class="imp"><thead><tr><th>المعلم</th><th>حضر</th><th>غاب</th><th>التفاصيل</th></tr></thead><tbody>'+ids.map(function(id){ var e=by[id];
+        return '<tr><td><b>'+esc(tn(id))+'</b></td><td class="n t-ok">'+e.p.length+'</td><td class="n '+(e.a.length?'bad':'')+'">'+e.a.length+'</td><td><details><summary>عرض الأيام</summary>'+e.p.concat(e.a).sort(function(x,y){return x.day<y.day?-1:1;}).map(function(x){ return '<div class="sub"><span dir="ltr">'+esc(x.day)+'</span> · '+esc(gl(x.group_id))+' · '+(x.status==='present'?'حضر':'<b class="bad">غاب</b>')+'</div>'; }).join('')+'</details></td></tr>'; }).join('')+'</tbody></table>':'<div class="sub">لا يوجد تسجيل حضور للمعلمين في هذا الشهر. يُسجَّل من شاشة «حصص اليوم».</div>');
+    })();
+    body.innerHTML=html+attHtml+'<div class="sub '+msgCls+'">'+esc(msg)+'</div>'; bindMonth(body);
     var box=body.querySelector('#th-form');
     function termOf(id){ var best=null; D.terms.forEach(function(t){ if(t.teacher_id===id&&t.from_date<=today()&&(!best||t.from_date>best.from_date)) best=t; }); return best; }
     function form(t){
       var tm=t?termOf(t.id):null;
       frm(box,'<label>الاسم<input name="name" required maxlength="80" value="'+esc(t?t.name:'')+'"></label><label>الهاتف<input name="ph" dir="ltr" maxlength="30" value="'+esc(t?t.phone:'')+'"></label>'+
-        '<label>نوع الأجر<select name="pt"><option value="percent"'+((!tm||tm.pay_type==='percent')?' selected':'')+'>نسبة من المحصّل %</option><option value="fixed"'+(tm&&tm.pay_type==='fixed'?' selected':'')+'>مبلغ ثابت شهرياً</option></select></label>'+
-        '<label>القيمة (نسبة أو مبلغ)<input name="rate" data-fmt="num" inputmode="decimal" autocomplete="off" required dir="ltr" value="'+(tm?esc(tm.rate):'')+'"></label>'+
+        '<label>نوع الأجر<select name="pt"><option value="percent"'+((!tm||tm.pay_type==='percent')?' selected':'')+'>نسبة من المحصّل %</option><option value="fixed"'+(tm&&tm.pay_type==='fixed'?' selected':'')+'>مبلغ ثابت شهرياً</option><option value="session"'+(tm&&tm.pay_type==='session'?' selected':'')+'>مبلغ لكل حصة</option></select></label>'+
+        '<label>القيمة (نسبة أو مبلغ أو سعر الحصة)<input name="rate" data-fmt="num" inputmode="decimal" autocomplete="off" required dir="ltr" value="'+(tm?esc(tm.rate):'')+'"></label>'+
         '<label>يسري من تاريخ<input name="from" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="YYYY-MM-DD" autocomplete="off" dir="ltr" required value="'+esc(tm?today():today().slice(0,8)+'01')+'"></label>'+
         (t?'<label>الحالة<select name="act"><option value="1"'+(t.active?' selected':'')+'>يعمل</option><option value="0"'+(t.active?'':' selected')+'>متوقف</option></select></label>':''),
         async function(f,sid){
@@ -1762,6 +1845,10 @@ input[type=file]{padding:.45em}
 .td-add{margin-top:8px}.td-add input{width:100%;box-sizing:border-box}
 .td-res{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 
+.td-t{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0 8px;padding:8px 10px;border-radius:12px;background:var(--surface2)}
+.td-sub{padding:7px 8px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:inherit;max-width:180px}
+.td-pp{margin:8px 0;padding:10px 12px;border:1px dashed var(--line);border-radius:12px;display:flex;flex-direction:column;gap:8px}
+
 /* ===== refined theme: ivory + deep green + logo gold ===== */
 body{font-feature-settings:"lnum" 1,"tnum" 1;-webkit-font-smoothing:antialiased;letter-spacing:.005em}
 h1,h2,h3,.h3{letter-spacing:0}
@@ -1994,10 +2081,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 
           <div class="field"><label for="st-remind">التنبيه قبل انتهاء الاشتراك (بالأيام)</label><input id="st-remind" type="text" inputmode="numeric" maxlength="2" class="ltr"></div>
           <div class="field"><label for="st-cc">رمز الدولة للواتساب</label><input id="st-cc" inputmode="numeric" class="ltr" maxlength="5"></div>
         </div>
+        <div id="st-courses-box" hidden>
         <h3 class="h3">الدورات والرسوم الافتراضية</h3>
         <p class="hint">عند اختيار دورة أثناء التسجيل تُملأ رسومها تلقائياً (الشهرية أو سعر الحصة حسب نوع الاشتراك)، ويمكن تعديلها لكل طالب.</p>
         <div id="st-courses" style="margin-top:10px"></div>
         <div class="row"><button class="btn" type="button" data-act="add-course">+ إضافة دورة</button></div>
+        </div>
         <div class="err" id="st-err" role="alert"></div>
         <div class="row"><button class="btn primary" type="submit">حفظ الإعدادات</button></div>
       </form>
@@ -2507,6 +2596,7 @@ function subFieldsHtml(pre,o){
     '<div class="field"><label for="'+pre+'-paid">المدفوع الآن ('+esc(S.settings.currency)+')</label><input id="'+pre+'-paid" data-f="paid" inputmode="decimal" class="ltr" placeholder="0" value=""></div>'+
     '<div class="field"><label for="'+pre+'-method">طريقة الدفع</label><select id="'+pre+'-method" data-f="method"><option value="cash">نقداً</option><option value="transfer">حوالة / تحويل</option></select></div>'+
     teacherFieldHtml(pre,o)+
+    payDateFieldHtml(pre,o)+
   '</div>';
 }
 function readSubFields(box,required){
@@ -2549,8 +2639,10 @@ function readSubFields(box,required){
   var paid=paidRaw===''?0:parseAmt(paidRaw);
   if(isNaN(paid)) return {error:'المبلغ المدفوع غير صحيح.'};
   if(paid>net) return {error:'المدفوع ('+money(paid)+') أكبر من الرسوم بعد الخصم ('+money(net)+').'};
+  var pdEl=box.querySelector('[data-f="paydate"]'), payDate='';
+  if(pdEl&&paid>0){ payDate=parseDIn(pdEl.value.trim()); if(!isDate(payDate)) return {error:'تاريخ الدفعة غير صحيح. اكتبه بالشكل 05/11/2026.'}; }
   var tEl=box.querySelector('[data-f="teacher"]');
-  return {sessions:pack?sn:0,groups:pack?gl:[],subjects:g('subjects'),kind:session?'session':(pack?'pack':'month'),course:course,start:start,months:months,end:end,fee:net,paid:paid,discount:disc,discountPct:dpct,discountReason:disc>0?dreason:'',method:g('method')==='transfer'?'transfer':'cash',teacherId:tEl&&tEl.value?tEl.value:''};
+  return {payDate:payDate,sessions:pack?sn:0,groups:pack?gl:[],subjects:g('subjects'),kind:session?'session':(pack?'pack':'month'),course:course,start:start,months:months,end:end,fee:net,paid:paid,discount:disc,discountPct:dpct,discountReason:disc>0?dreason:'',method:g('method')==='transfer'?'transfer':'cash',teacherId:tEl&&tEl.value?tEl.value:''};
 }
 function autoFee(box){
   if(!box) return;
@@ -2562,6 +2654,7 @@ function autoFee(box){
   if(v) fee.value=v;
 }
 async function writeSub(studentId,v){
+  if(v.paid>0&&v.payDate&&!(await confirmClosedDay(v.payDate))) throw new Error('لم يُحفظ الاشتراك بسبب إقفال ذلك اليوم.');
   var ref=S.db.collection('subs').doc();
   await ref.set(Object.assign({studentId:studentId,course:v.course,start:v.start,months:v.months,end:v.end,fee:v.fee,at:Date.now()},v.kind==='session'?{kind:'session'}:v.kind==='pack'?{kind:'pack',sessionsTotal:v.sessions,sessionsAdjust:0}:{},v.discount>0?{discount:v.discount,discountPct:v.discountPct,discountReason:v.discountReason}:{},v.subjects?{subjects:v.subjects}:{},v.teacherId?{teacherId:v.teacherId}:{}));
   if(v.kind==='pack'){
@@ -2569,7 +2662,7 @@ async function writeSub(studentId,v){
     catch(e){ try{ await ref.delete(); }catch(x){} throw e; }
   }
   if(v.paid>0){
-    await S.db.collection('payments').doc().set({studentId:studentId,subId:ref.id,amount:v.paid,date:todayStr(),note:'دفعة عند الاشتراك',method:v.method==='transfer'?'transfer':'cash',at:Date.now()});
+    await S.db.collection('payments').doc().set({studentId:studentId,subId:ref.id,amount:v.paid,date:(v.payDate&&isDate(v.payDate)?v.payDate:todayStr()),note:'دفعة عند الاشتراك',method:v.method==='transfer'?'transfer':'cash',at:Date.now()});
   }
 }
 
@@ -2697,14 +2790,14 @@ function renderDetail(){
     return '<div class="item"><div class="i-main"><b>'+esc(s.course)+'</b><div class="sub">'+(sess?'حصة بتاريخ '+fmtDate(s.start):s.kind==='pack'?'باقة '+((s.sessionsTotal||0)+(s.sessionsAdjust||0))+' حصة · تبدأ '+fmtDate(s.start):'من '+fmtDate(s.start)+' إلى '+fmtDate(s.end)+' · '+esc(s.months||'')+' شهر')+(teacherName(s.teacherId)?' · '+esc(teacherName(s.teacherId)):'')+'</div>'+(s.kind==='pack'?packInfoHtml(s):'')+(s.subjects?'<div class="sub">المواد: '+esc(s.subjects)+'</div>':'')+(s.discount>0?'<div class="sub t-ok">خصم '+esc(money(s.discount))+(s.discountPct?' ('+esc(s.discountPct)+'%)':'')+' — '+esc(s.discountReason||'')+(s.discountBy?' · '+esc(s.discountBy):'')+'</div>':'')+'</div>'+
       '<div class="i-nums"><span>الرسوم '+esc(money(s.fee))+'</span><span>المدفوع '+esc(money(s.paid))+'</span><span class="'+(s.remaining>0?'t-crit':'')+'">المتبقي '+esc(money(s.remaining))+'</span></div>'+
       '<div class="i-act">'+pill+'<button class="btn sm" type="button" data-act="receipt" data-sub="'+esc(s.id)+'">إيصال</button>'+(s.remaining>0?'<button class="btn sm" type="button" data-act="panel" data-panel="pay" data-sub="'+esc(s.id)+'">دفعة</button>':'')+
-      '<button class="btn sm danger" type="button" data-act="del-sub" data-id="'+esc(s.id)+'">حذف</button></div></div>';
+      (isOwner()?'<button class="btn sm" type="button" data-xact="sub-edit" data-id="'+esc(s.id)+'">تعديل</button>':'')+'<button class="btn sm danger" type="button" data-act="del-sub" data-id="'+esc(s.id)+'">حذف</button></div></div>';
   }).join(''):'<div class="sub">لا توجد اشتراكات. استخدم «تجديد الاشتراك» لإضافة اشتراك.</div>');
 
   var subById={}; r.subs.forEach(function(s){subById[s.id]=s;});
   $('#d-pays').innerHTML=r.pays.length?r.pays.map(function(p){
     var s=subById[p.subId];
     return '<div class="item"><div class="i-main"><b class="num">'+esc(mny(p.amount))+'</b><div class="sub">'+fmtDate(p.date)+(s?' · '+esc(s.course):'')+(p.method==='transfer'?' · <b>حوالة</b>':'')+(p.note?' · '+esc(p.note):'')+'</div></div>'+
-      '<div class="i-act">'+(s?'<button class="btn sm" type="button" data-act="receipt" data-sub="'+esc(s.id)+'">إيصال</button>':'')+'<button class="btn sm danger" type="button" data-act="del-pay" data-id="'+esc(p.id)+'">حذف</button></div></div>';
+      '<div class="i-act">'+(s?'<button class="btn sm" type="button" data-act="receipt" data-sub="'+esc(s.id)+'">إيصال</button>':'')+(isOwner()?'<button class="btn sm" type="button" data-xact="pay-edit" data-id="'+esc(p.id)+'">تعديل</button>':'')+'<button class="btn sm danger" type="button" data-act="del-pay" data-id="'+esc(p.id)+'">حذف</button></div></div>';
   }).join(''):'<div class="sub">لا توجد دفعات بعد.</div>';
   renderDetailAtt(r);
 
@@ -2770,6 +2863,7 @@ async function submitPay(){
   if(amt>s.remaining){ err.textContent='المبلغ أكبر من المتبقي على هذا الاشتراك ('+money(s.remaining)+').'; return; }
   btn.disabled=true; err.textContent='';
   try{
+    if(!(await confirmClosedDay(date))){ btn.disabled=false; return; }
     await S.db.collection('payments').doc().set({studentId:r.st.id,subId:s.id,amount:amt,date:date,note:$('#pay-note').value.trim(),method:$('#pay-method').value==='transfer'?'transfer':'cash',at:Date.now()});
     toast('تم تسجيل الدفعة'); showPanel('');
   }catch(e){ err.textContent='تعذر الحفظ: '+(e&&e.message?e.message:'خطأ غير معروف'); }
@@ -4080,19 +4174,31 @@ async function setMark(day,gid,sid,mark){
   }catch(e){ window.NOON_SM=prev; window.NOON_REDRAW(); toast('تعذر الحفظ: '+errMsg(e)); return; }
   api.reloadSessions();
 }
-async function setOff(day,gid,on){
+async function setOff(day,gid,on,extra){
   var api=window.NOON_API, prev=window.NOON_OFF||[];
   var rest=prev.filter(function(o){ return !(o.day===day&&o.group_id===gid); });
-  window.NOON_OFF=on?rest.concat([{group_id:gid,day:day,note:''}]):rest; window.NOON_REDRAW();
+  var row=Object.assign({group_id:gid,day:day,note:'',moved_to:null,moved_t:null},extra||{});
+  window.NOON_OFF=on?rest.concat([row]):rest; window.NOON_REDRAW();
   try{
-    if(on) await api.http('POST','/rest/v1/group_off?on_conflict=group_id,day',{body:[{group_id:gid,day:day,note:''}],headers:{Prefer:'resolution=merge-duplicates,return=minimal'}});
+    if(on) await api.http('POST','/rest/v1/group_off?on_conflict=group_id,day',{body:[row],headers:{Prefer:'resolution=merge-duplicates,return=minimal'}});
     else await api.http('DELETE','/rest/v1/group_off?day=eq.'+day+'&group_id=eq.'+encodeURIComponent(gid),{headers:{Prefer:'return=minimal'}});
-  }catch(e){ window.NOON_OFF=prev; window.NOON_REDRAW(); toast('تعذر الحفظ: '+errMsg(e)); return; }
+  }catch(e){ window.NOON_OFF=prev; window.NOON_REDRAW(); toast('تعذر الحفظ: '+errMsg(e)); return false; }
+  api.reloadSessions(); return true;
+}
+/* teacher attendance for one session: present (his own group or a substitute), absent, or cleared */
+async function setTeacher(day,gid,tid,status){
+  var api=window.NOON_API, prev=window.NOON_TS||[];
+  var rest=prev.filter(function(t){ return !(t.day===day&&t.group_id===gid); });
+  window.NOON_TS=status?rest.concat([{day:day,group_id:gid,teacher_id:tid,status:status}]):rest; window.NOON_REDRAW();
+  try{
+    if(status) await api.http('POST','/rest/v1/teacher_sessions?on_conflict=day,group_id',{body:[{day:day,group_id:gid,teacher_id:tid,status:status}],headers:{Prefer:'resolution=merge-duplicates,return=minimal'}});
+    else await api.http('DELETE','/rest/v1/teacher_sessions?day=eq.'+day+'&group_id=eq.'+encodeURIComponent(gid),{headers:{Prefer:'return=minimal'}});
+  }catch(e){ window.NOON_TS=prev; window.NOON_REDRAW(); toast('تعذر الحفظ: '+errMsg(e)); return; }
   api.reloadSessions();
 }
 
 /* ----- today's sessions screen ----- */
-var TD={day:'',open:false,adding:null};
+var TD={day:'',open:false,pp:null};
 function wdOf(day){ return new Date(day+'T00:00:00Z').getUTCDay(); }
 function rosterFor(g,day){
   var ids={}, out=[], cut=addDays(day,-45);
@@ -4109,17 +4215,54 @@ function leftFor(r,g,day){
   if(!packs.length) return null;
   return packs.reduce(function(t,s){ return t+(s.left||0); },0);
 }
+function todaySessions(day){
+  var wd=wdOf(day), offs=window.NOON_OFF||[], out=[];
+  (window.NOON_GROUPS||[]).forEach(function(g){
+    var sl=(g.slots||[]).filter(function(s){ return s.d===wd; }).sort(function(a,b){ return a.t.localeCompare(b.t); });
+    if(g.active&&sl.length) out.push({g:g,sl:sl,off:offs.filter(function(o){ return o.group_id===g.id&&o.day===day; })[0]||null,mk:null});
+  });
+  offs.forEach(function(o){
+    if(o.moved_to!==day) return;
+    var g=(window.NOON_GROUPS||[]).filter(function(x){ return x.id===o.group_id; })[0]; if(!g) return;
+    if(out.some(function(x){ return x.g.id===g.id&&!x.off; })) return;
+    var ow=wdOf(o.day), os=(g.slots||[]).filter(function(s){ return s.d===ow; })[0]; if(!os) return;
+    out.push({g:g,sl:[{t:o.moved_t||os.t,m:os.m}],off:null,mk:o});
+  });
+  return out.sort(function(a,b){ return a.sl[0].t.localeCompare(b.sl[0].t)||a.g.grade-b.g.grade; });
+}
+function ppFormHtml(it){
+  var pp=TD.pp, n=pp.n||0;
+  return '<div class="td-pp"><div class="field"><label>أُجّلت إلى تاريخ</label><input class="ltr dateinput" id="pp-d" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off" value="'+esc(pp.d||'')+'"></div>'+
+    '<div class="field"><label>وقت البداية (اختياري)</label><input class="ltr" id="pp-t" inputmode="numeric" maxlength="5" placeholder="16:00" autocomplete="off" value="'+esc(pp.t||'')+'"></div>'+
+    (pp.msg?'<div class="err" role="alert">'+esc(pp.msg)+'</div>':'')+
+    '<div class="row"><button class="btn primary" type="button" data-xact="td-pp-save" data-g="'+esc(it.g.id)+'">'+(n===0?'تأجيل إلى هذا التاريخ':n===1?'حفظ رغم التعارض (1/2)':'تأكيد نهائي (2/2)')+'</button>'+
+    '<button class="btn" type="button" data-xact="td-pp-save" data-g="'+esc(it.g.id)+'" data-nodate="1">تأجيل بدون تحديد موعد</button><button class="btn" type="button" data-xact="td-pp-x">إلغاء</button></div></div>';
+}
 function todayHtml(){
-  var day=TD.day, wd=wdOf(day), offs=window.NOON_OFF||[], marks={};
+  var day=TD.day, wd=wdOf(day), marks={}, tsm={};
   (window.NOON_SM||[]).forEach(function(m){ if(m.day===day) marks[m.group_id+'|'+m.student_id]=m.mark; });
-  var gs=(window.NOON_GROUPS||[]).filter(function(g){ return g.active&&(g.slots||[]).some(function(s){ return s.d===wd; }); }).sort(function(a,b){ var x=a.slots.filter(function(s){return s.d===wd;})[0].t, y=b.slots.filter(function(s){return s.d===wd;})[0].t; return x.localeCompare(y)||a.grade-b.grade; });
+  (window.NOON_TS||[]).forEach(function(t){ if(t.day===day) tsm[t.group_id]=t; });
+  var items=todaySessions(day);
   var h='<div class="td-nav"><button class="btn sm" type="button" data-xact="td-day" data-d="-1">‹ السابق</button><div class="td-date"><b>'+DAYN[wd]+'</b> <span dir="ltr">'+esc(fmtDate(day))+'</span>'+(day===todayStr()?' <span class="pill ok">اليوم</span>':'')+'</div><button class="btn sm" type="button" data-xact="td-day" data-d="1">التالي ›</button>'+(day!==todayStr()?'<button class="btn sm" type="button" data-xact="td-day" data-d="0">اليوم</button>':'')+'</div>';
-  if(!gs.length) return h+'<div class="empty">لا توجد حصص في جدول هذا اليوم. تُضاف المجموعات ومواعيدها من «الجدول والأسعار».</div>';
-  return h+gs.map(function(g){
-    var sl=g.slots.filter(function(s){ return s.d===wd; }).sort(function(a,b){ return a.t.localeCompare(b.t); }), isOff=offs.some(function(o){ return o.day===day&&o.group_id===g.id; });
+  if(!items.length) return h+'<div class="empty">لا توجد حصص في جدول هذا اليوم. تُضاف المجموعات ومواعيدها من «الجدول والأسعار».</div>';
+  var tchs=(window.NOON_TEACHERS||[]).filter(function(x){ return x.active; });
+  return h+items.map(function(it){
+    var g=it.g, sl=it.sl, isOff=!!it.off;
     var t=(window.NOON_TEACHERS||[]).filter(function(x){ return x.id===g.teacher_id; })[0];
-    var hd='<div class="td-h"><div><b>'+esc(grpName(g.id))+'</b><div class="sub">'+sl.map(function(s){ return esc(s.t)+' ('+s.m+' د)'; }).join(' + ')+(t?' · '+esc(t.name):'')+'</div></div><button class="btn sm'+(isOff?' primary':'')+'" type="button" data-xact="td-off" data-g="'+esc(g.id)+'" data-on="'+(isOff?'0':'1')+'">'+(isOff?'إلغاء التأجيل':'تأجيل الحصة')+'</button></div>';
-    if(isOff) return '<div class="td-g off">'+hd+'<div class="sub">الحصة مؤجلة في هذا اليوم ولا تُحتسب على أحد.</div></div>';
+    var hd='<div class="td-h"><div><b>'+esc(grpName(g.id))+'</b>'+(it.mk?' <span class="pill info">تعويضية عن '+esc(fmtDate(it.mk.day))+'</span>':'')+'<div class="sub">'+sl.map(function(s){ return esc(s.t)+' ('+s.m+' د)'; }).join(' + ')+(t?' · '+esc(t.name):'')+'</div></div>'+
+      (isOff?'':'<button class="btn sm" type="button" data-xact="td-off" data-g="'+esc(g.id)+'">تأجيل الحصة</button>')+'</div>';
+    if(isOff){
+      var o=it.off;
+      return '<div class="td-g off">'+hd+'<div class="sub">الحصة مؤجلة في هذا اليوم ولا تُحتسب على أحد'+(o.moved_to?'، وأُجّلت إلى <b dir="ltr">'+esc(fmtDate(o.moved_to))+'</b>'+(o.moved_t?' الساعة '+esc(o.moved_t):''):' (بدون موعد محدد)')+'.</div>'+
+        (TD.pp&&TD.pp.g===g.id?ppFormHtml(it):'<div class="row"><button class="btn sm primary" type="button" data-xact="td-off" data-g="'+esc(g.id)+'">'+(o.moved_to?'تغيير الموعد':'تحديد موعد التعويض')+'</button><button class="btn sm" type="button" data-xact="td-unoff" data-g="'+esc(g.id)+'">إلغاء التأجيل</button></div>')+'</div>';
+    }
+    // teacher attendance
+    var tr=tsm[g.id], tchHtml='';
+    var stTxt=!tr?'<span class="pill mute">لم يُسجَّل</span>':tr.status==='absent'?'<span class="pill crit">غاب</span>':(tr.teacher_id===g.teacher_id?'<span class="pill ok">حضر</span>':'<span class="pill info">بديل: '+esc((tchs.concat(window.NOON_TEACHERS||[]).filter(function(x){return x.id===tr.teacher_id;})[0]||{}).name||'')+'</span>');
+    tchHtml='<div class="td-t"><span class="sub">المعلم:</span> '+stTxt+' '+
+      (g.teacher_id?'<button class="mk p'+(tr&&tr.status==='present'&&tr.teacher_id===g.teacher_id?' on':'')+'" type="button" data-xact="td-tc" data-g="'+esc(g.id)+'" data-t="'+esc(g.teacher_id)+'" data-m="present">حضر</button><button class="mk a'+(tr&&tr.status==='absent'?' on':'')+'" type="button" data-xact="td-tc" data-g="'+esc(g.id)+'" data-t="'+esc(g.teacher_id)+'" data-m="absent">غاب</button>':'')+
+      '<select class="td-sub" data-g="'+esc(g.id)+'" aria-label="معلم بديل"><option value="">'+(g.teacher_id?'بديل…':'المعلم الذي أعطى الحصة…')+'</option>'+tchs.filter(function(x){ return x.id!==g.teacher_id; }).map(function(x){ return '<option value="'+esc(x.id)+'"'+(tr&&tr.status==='present'&&tr.teacher_id===x.id?' selected':'')+'>'+esc(x.name)+'</option>'; }).join('')+'</select>'+
+      (tr?'<button class="mk x" type="button" data-xact="td-tc" data-g="'+esc(g.id)+'" data-m="" aria-label="مسح">×</button>':'')+'</div>';
     var ros=rosterFor(g,day), cnt={p:0,a:0,e:0};
     var rows=ros.map(function(r){
       var m=marks[g.id+'|'+r.st.id]||''; if(m) cnt[m]++;
@@ -4129,7 +4272,7 @@ function todayHtml(){
       return '<div class="td-r"><div class="td-n"><button class="linklike" type="button" data-xact="td-open" data-id="'+esc(r.st.id)+'">'+esc(r.st.name)+'</button> '+badge+'</div><div class="td-b">'+b('p','حاضر')+b('a','غائب')+b('e','بعذر')+(m?'<button class="mk x" type="button" data-xact="td-mk" data-g="'+esc(g.id)+'" data-s="'+esc(r.st.id)+'" data-m="" aria-label="مسح">×</button>':'')+'</div></div>';
     }).join('');
     var add='<div class="td-add"><input type="text" id="td-q-'+esc(g.id)+'" data-g="'+esc(g.id)+'" placeholder="+ طالب خارج القائمة (اكتب الاسم)" autocomplete="off"><div class="td-res" id="td-res-'+esc(g.id)+'"></div></div>';
-    return '<div class="td-g">'+hd+'<div class="sub">حاضر '+cnt.p+' · غائب '+cnt.a+' · بعذر '+cnt.e+' · من '+ros.length+'</div>'+(rows||'<div class="sub">لا طلاب مرتبطون بهذه المجموعة بعد (تُربط من نموذج باقة الحصص).</div>')+add+'</div>';
+    return '<div class="td-g">'+hd+(TD.pp&&TD.pp.g===g.id?ppFormHtml(it):'')+tchHtml+'<div class="sub">حاضر '+cnt.p+' · غائب '+cnt.a+' · بعذر '+cnt.e+' · من '+ros.length+'</div>'+(rows||'<div class="sub">لا طلاب مرتبطون بهذه المجموعة بعد (تُربط من نموذج باقة الحصص).</div>')+add+'</div>';
   }).join('');
 }
 function renderToday(){
@@ -4164,10 +4307,33 @@ document.addEventListener('input',function(e){
 document.addEventListener('click',async function(e){
   var el=e.target.closest&&e.target.closest('[data-xact]'); if(!el) return;
   var a=el.dataset.xact;
-  if(a==='td-day'){ var d=Number(el.dataset.d); TD.day=d===0?todayStr():addDays(TD.day,d); renderToday(); }
+  if(a==='td-day'){ TD.pp=null; var d=Number(el.dataset.d); TD.day=d===0?todayStr():addDays(TD.day,d); renderToday(); }
   else if(a==='td-mk') setMark(TD.day,el.dataset.g,el.dataset.s,el.dataset.m);
   else if(a==='td-add') setMark(TD.day,el.dataset.g,el.dataset.s,'p');
-  else if(a==='td-off') setOff(TD.day,el.dataset.g,el.dataset.on==='1');
+  else if(a==='td-off'){ var og=el.dataset.g, ex=(window.NOON_OFF||[]).filter(function(o){ return o.day===TD.day&&o.group_id===og; })[0]; TD.pp={g:og,d:ex&&ex.moved_to?fmtDate(ex.moved_to):'',t:ex&&ex.moved_t||'',n:0,msg:''}; renderToday(); }
+  else if(a==='td-pp-x'){ TD.pp=null; renderToday(); }
+  else if(a==='td-unoff'){ TD.pp=null; setOff(TD.day,el.dataset.g,false); }
+  else if(a==='td-tc'){ var tg=el.dataset.g; if(!el.dataset.m) setTeacher(TD.day,tg,null,null); else setTeacher(TD.day,tg,el.dataset.t,el.dataset.m); }
+  else if(a==='td-pp-save'){
+    var pp=TD.pp, gid=el.dataset.g; if(!pp) return;
+    var it=todaySessions(TD.day).filter(function(x){ return x.g.id===gid; })[0]; if(!it) return;
+    var d=null, t=null;
+    if(!el.dataset.nodate){
+      var dv=parseDIn(document.getElementById('pp-d').value.trim()), tv=latinDigits(document.getElementById('pp-t').value.trim());
+      pp.d=document.getElementById('pp-d').value; pp.t=document.getElementById('pp-t').value;
+      if(!isDate(dv)){ pp.msg='اكتب تاريخ التعويض بالشكل 25/10/2026.'; pp.n=0; renderToday(); return; }
+      if(dv===TD.day){ pp.msg='تاريخ التعويض هو نفس اليوم.'; pp.n=0; renderToday(); return; }
+      if(tv&&!/^([01]?\d|2[0-3]):[0-5]\d$/.test(tv)){ pp.msg='اكتب الوقت هكذا: 16:00'; pp.n=0; renderToday(); return; }
+      if(tv&&tv.length===4) tv='0'+tv;
+      d=dv; t=tv||null;
+      var wdn=wdOf(d), os=(it.g.slots||[]).filter(function(s){ return s.d===wdOf(TD.day); })[0]||it.sl[0];
+      var cl=window.NOON_CLASH(it.g.teacher_id,d,t||os.t,os.m);
+      var sig=cl.join('|'); if(pp.sig!==sig){ pp.sig=sig; pp.n=0; }
+      if(cl.length&&pp.n<2){ pp.n++; pp.msg='تعارض: المعلم لديه في ذلك الوقت '+cl.join(' | ')+'. '+(pp.n===1?'اضغط الزر مرة أخرى للمتابعة رغم التعارض.':'اضغط مرة أخيرة للتأكيد النهائي.'); renderToday(); return; }
+    }
+    TD.pp=null;
+    setOff(TD.day,gid,true,{moved_to:d,moved_t:t});
+  }
   else if(a==='td-open'){ closeX(); openDetail(el.dataset.id); }
   else if(a==='pk-adj'){
     var sid=el.dataset.id, s=null; D.rows.forEach(function(r){ r.subs.forEach(function(x){ if(x.id===sid) s=x; }); });
@@ -4194,6 +4360,114 @@ document.addEventListener('click',async function(e){
       await api.reloadSessions(); closeX(); toast('تم حفظ المجموعات');
     }catch(x){ el.disabled=false; var er=document.getElementById('pkg-err'); if(er) er.textContent='تعذر الحفظ: '+errMsg(x); }
   }
+});
+
+document.addEventListener('change',function(e){
+  var t=e.target; if(!t||!t.classList||!t.classList.contains('td-sub')) return;
+  if(t.value) setTeacher(TD.day,t.dataset.g,t.value,'present');
+});
+
+
+/* ===== stage 5: payment date, owner edits of subscriptions / payments ===== */
+function isOwner(){ return !!(window.CLOUD&&window.CLOUD.role==='owner'); }
+function payDateFieldHtml(pre,o){
+  if(!isOwner()) return '';
+  var st=o&&o.start||todayStr(), d=st<=todayStr()?st:todayStr();
+  return '<div class="field"><label for="'+pre+'-paydate">تاريخ الدفعة</label><input id="'+pre+'-paydate" data-f="paydate" class="ltr dateinput" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off" value="'+esc(fmtDate(d))+'"></div>';
+}
+document.addEventListener('input',function(e){
+  var t=e.target; if(!t||!t.dataset) return;
+  if(t.dataset.f==='paydate'){ t.dataset.touched='1'; return; }
+  if(t.dataset.f==='start'){
+    var bx=t.closest('.subfields'), pd=bx&&bx.querySelector('[data-f="paydate"]'); if(!pd||pd.dataset.touched) return;
+    var v=parseDIn(t.value.trim()); if(isDate(v)) pd.value=fmtDate(v<=todayStr()?v:todayStr());
+  }
+});
+async function confirmClosedDay(day){
+  if(!isOwner()||!day||day===todayStr()) return true;
+  var closed=false; try{ closed=await window.NOON_API.isClosed(day); }catch(x){}
+  if(!closed) return true;
+  return confirm('تنبيه: درج يوم '+fmtDate(day)+' مُقفل سابقاً. تسجيل دفعة أو تعديلها بهذا التاريخ يغيّر أرقام ذلك اليوم بعد إقفاله (يمكنك إعادة إقفاله لاحقاً). هل تريد المتابعة؟');
+}
+function teacherOptions(sel){
+  return '<option value="">غير محدد</option>'+(window.NOON_TEACHERS||[]).filter(function(t){ return t.active||t.id===sel; }).map(function(t){ return '<option value="'+esc(t.id)+'"'+(t.id===sel?' selected':'')+'>'+esc(t.name)+'</option>'; }).join('');
+}
+function findSub(id){ var s=null; D.rows.forEach(function(r){ r.subs.forEach(function(x){ if(x.id===id) s=x; }); }); return s; }
+function openSubEdit(id){
+  var s=findSub(id); if(!s) return;
+  var kind=s.kind==='session'?'session':s.kind==='pack'?'pack':'month';
+  var o=xModal('تعديل الاشتراك',
+    '<form id="f-subedit" novalidate><div class="fgrid">'+
+    '<div class="field wide"><label>الدورة</label><input id="se-course" maxlength="120" value="'+esc(s.course||'')+'"></div>'+
+    '<div class="field wide"><label>المواد / التفاصيل</label><input id="se-subjects" maxlength="100" value="'+esc(s.subjects||'')+'"></div>'+
+    '<div class="field"><label>'+(kind==='session'?'تاريخ الحصة':'تاريخ البداية')+'</label><input id="se-start" class="ltr dateinput" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off" value="'+esc(fmtDate(s.start))+'"></div>'+
+    (kind==='month'?'<div class="field"><label>تاريخ الانتهاء</label><input id="se-end" class="ltr dateinput" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off" value="'+esc(fmtDate(s.end))+'"></div><div class="field"><label>المدة (أشهر)</label><input id="se-months" class="ltr" inputmode="numeric" maxlength="2" value="'+esc(s.months||1)+'"></div>':'')+
+    (kind==='pack'?'<div class="field"><label>عدد حصص الباقة</label><input id="se-sessions" class="ltr" inputmode="numeric" maxlength="3" value="'+esc(s.sessionsTotal||'')+'"></div>':'')+
+    '<div class="field"><label>الرسوم المطلوبة (بعد الخصم)</label><input id="se-fee" class="ltr" inputmode="decimal" value="'+esc(s.fee)+'"></div>'+
+    '<div class="field"><label>المعلم</label><select id="se-teacher">'+teacherOptions(s.teacherId)+'</select></div>'+
+    '</div>'+(s.discount>0?'<p class="hint">على هذا الاشتراك خصم مسجَّل ('+esc(money(s.discount))+') يبقى كما هو؛ عدّل «الرسوم المطلوبة» إن أردت تغيير المبلغ النهائي.</p>':'')+
+    '<p class="hint">المدفوع حتى الآن: '+esc(money(s.paid))+'. لتعديل تاريخ دفعة أو مبلغها استخدم زر «تعديل» أمامها في قائمة الدفعات.</p>'+
+    '<div class="err" id="se-err" role="alert"></div><div class="row"><button class="btn primary" type="submit">حفظ</button><button class="btn" type="button" data-xact="close">إلغاء</button></div></form>');
+  o.__sub=s; o.__kind=kind;
+}
+async function submitSubEdit(form){
+  var o=document.getElementById('x-modal'), s=o&&o.__sub, kind=o&&o.__kind, err=document.getElementById('se-err'), btn=form.querySelector('button[type=submit]'); if(!s) return;
+  var course=document.getElementById('se-course').value.trim(), start=parseDIn(document.getElementById('se-start').value.trim()), fee=parseAmt(document.getElementById('se-fee').value);
+  if(!course){ err.textContent='اكتب اسم الدورة.'; return; }
+  if(!isDate(start)){ err.textContent='تاريخ البداية غير صحيح.'; return; }
+  if(isNaN(fee)||fee<0){ err.textContent='اكتب الرسوم كرقم صحيح.'; return; }
+  if(fee<s.paid){ err.textContent='الرسوم ('+money(fee)+') أقل من المدفوع ('+money(s.paid)+'). عدّل الدفعات أولاً.'; return; }
+  var upd={course:course,subjects:document.getElementById('se-subjects').value.trim(),start:start,fee:fee,teacherId:document.getElementById('se-teacher').value||null};
+  if(kind==='session') upd.end=start;
+  if(kind==='month'){
+    var end=parseDIn(document.getElementById('se-end').value.trim()), mo=parseInt(latinDigits(document.getElementById('se-months').value),10);
+    if(!isDate(end)||end<start){ err.textContent='تاريخ الانتهاء غير صحيح أو قبل البداية.'; return; }
+    if(!(mo>=1&&mo<=60)){ err.textContent='المدة من 1 إلى 60 شهراً.'; return; }
+    upd.end=end; upd.months=mo;
+  }
+  if(kind==='pack'){
+    var sn=parseInt(latinDigits(document.getElementById('se-sessions').value),10);
+    if(!(sn>=1&&sn<=200)){ err.textContent='عدد الحصص من 1 إلى 200.'; return; }
+    upd.sessionsTotal=sn; upd.end=addDays(start,27);
+  }
+  btn.disabled=true; err.textContent='';
+  try{ await S.db.collection('subs').doc(s.id).update(upd); closeX(); toast('تم حفظ التعديل'); }
+  catch(x){ err.textContent='تعذر الحفظ: '+errMsg(x); btn.disabled=false; }
+}
+function openPayEdit(id){
+  var p=S.payments.filter(function(x){ return x.id===id; })[0]; if(!p) return;
+  var s=findSub(p.subId);
+  var o=xModal('تعديل الدفعة',
+    '<form id="f-payedit" novalidate><div class="fgrid">'+
+    '<div class="field"><label>المبلغ</label><input id="pe-amt" class="ltr" inputmode="decimal" value="'+esc(p.amount)+'"></div>'+
+    '<div class="field"><label>التاريخ</label><input id="pe-date" class="ltr dateinput" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off" value="'+esc(fmtDate(p.date))+'"></div>'+
+    '<div class="field"><label>الطريقة</label><select id="pe-method"><option value="cash"'+(p.method==='transfer'?'':' selected')+'>نقداً</option><option value="transfer"'+(p.method==='transfer'?' selected':'')+'>حوالة / تحويل</option></select></div>'+
+    '<div class="field wide"><label>ملاحظة</label><input id="pe-note" maxlength="200" value="'+esc(p.note||'')+'"></div></div>'+
+    '<p class="hint">يُسجَّل هذا التعديل في سجل التحركات. إذا غيّرت التاريخ فإن الدخل اليومي وملخص الشهر يتبعان التاريخ الجديد.</p>'+
+    '<div class="err" id="pe-err" role="alert"></div><div class="row"><button class="btn primary" type="submit">حفظ</button><button class="btn" type="button" data-xact="close">إلغاء</button></div></form>');
+  o.__pay=p; o.__s=s;
+}
+async function submitPayEdit(form){
+  var o=document.getElementById('x-modal'), p=o&&o.__pay, s=o&&o.__s, err=document.getElementById('pe-err'), btn=form.querySelector('button[type=submit]'); if(!p) return;
+  var amt=parseAmt(document.getElementById('pe-amt').value), date=parseDIn(document.getElementById('pe-date').value.trim());
+  if(isNaN(amt)||amt<=0){ err.textContent='اكتب مبلغاً أكبر من صفر.'; return; }
+  if(!isDate(date)){ err.textContent='التاريخ غير صحيح.'; return; }
+  if(s&&r3(s.paid-p.amount+amt)>s.fee){ err.textContent='المبلغ يتجاوز رسوم الاشتراك ('+money(s.fee)+'). المتاح لهذه الدفعة حتى '+money(r3(s.fee-s.paid+p.amount))+'.'; return; }
+  btn.disabled=true; err.textContent='';
+  try{
+    if(!(await confirmClosedDay(date))||(date!==p.date&&!(await confirmClosedDay(p.date)))){ btn.disabled=false; return; }
+    await S.db.collection('payments').doc(p.id).update({amount:amt,date:date,method:document.getElementById('pe-method').value==='transfer'?'transfer':'cash',note:document.getElementById('pe-note').value.trim()});
+    closeX(); toast('تم حفظ التعديل');
+  }catch(x){ err.textContent='تعذر الحفظ: '+errMsg(x); btn.disabled=false; }
+}
+document.addEventListener('click',function(e){
+  var el=e.target.closest&&e.target.closest('[data-xact]'); if(!el) return;
+  if(el.dataset.xact==='sub-edit') openSubEdit(el.dataset.id);
+  else if(el.dataset.xact==='pay-edit') openPayEdit(el.dataset.id);
+});
+document.addEventListener('submit',function(e){
+  if(e.target.id==='f-subedit'){ e.preventDefault(); submitSubEdit(e.target); }
+  else if(e.target.id==='f-payedit'){ e.preventDefault(); submitPayEdit(e.target); }
 });
 
 window.__app={buildBackup:buildBackup,downloadBackup:downloadBackup,buildPdf:buildPdf};
