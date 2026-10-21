@@ -1304,7 +1304,7 @@ function openMoney(){
     var html=monthPicker()+'<div class="row" style="margin:0 0 10px"><button class="btn sm primary" type="button" id="th-new">إضافة معلم</button></div><div id="th-form"></div>'+
       '<p class="sub" style="margin-top:0">المستحق للمعلم: نسبة من المبالغ التي دفعها طلاب اشتراكاته خلال الشهر، أو مبلغ ثابت شهري، أو مبلغ لكل حصة (يُحسب من حضوره المسجَّل في «حصص اليوم»). اربط كل اشتراك بمعلمه عند تسجيل الاشتراك. تُحسب النسبة على ما دُفع فعلاً (بعد الخصم).</p>'+
       '<table class="imp"><thead><tr><th>المعلم</th><th>الأجر</th><th>محصّل من طلابه / عدد الحصص</th><th>المستحق</th><th>المدفوع</th><th>المتبقي</th><th></th></tr></thead><tbody>'+
-      (dues.length?dues.map(function(x){ return '<tr data-id="'+esc(x.teacher_id)+'"><td><b>'+esc(x.name)+'</b>'+(x.active?'':' <small>(متوقف)</small>')+'</td><td>'+(x.pay_type==='percent'?n2(x.rate)+'%':(x.pay_type==='fixed'?'ثابت '+n2(x.rate):(x.pay_type==='session'?n2(x.rate)+' للحصة':'<span class="bad">غير محدد</span>')))+'</td><td class="n">'+(x.pay_type==='percent'?n2(x.base):(x.pay_type==='session'?n2(x.base)+' حصة':'—'))+'</td><td class="n">'+n2(x.due)+'</td><td class="n t-ok">'+n2(x.paid)+'</td><td class="n '+(Number(x.remaining)>0?'warn':'')+'"><b>'+n2(x.remaining)+'</b></td><td class="nw"><button class="btn sm primary th-pay" type="button"'+(Number(x.remaining)>0?'':' disabled')+'>دفع</button> <button class="btn sm th-edit" type="button">تعديل</button> <button class="btn sm danger th-del" type="button">حذف</button></td></tr>'; }).join(''):'<tr><td colspan="7" class="empty">لا يوجد معلمون بعد.</td></tr>')+'</tbody></table>'+
+      (dues.length?dues.map(function(x){ return '<tr data-id="'+esc(x.teacher_id)+'"><td><b>'+esc(x.name)+'</b>'+(x.active?'':' <small>(متوقف)</small>')+'</td><td>'+(x.pay_type==='percent'?n2(x.rate)+'%':(x.pay_type==='fixed'?'ثابت '+n2(x.rate):(x.pay_type==='none'?'بدون راتب':x.pay_type==='session'?n2(x.rate)+' للحصة':'<span class="bad">غير محدد</span>')))+'</td><td class="n">'+(x.pay_type==='percent'?n2(x.base):(x.pay_type==='session'?n2(x.base)+' حصة':'—'))+'</td><td class="n">'+n2(x.due)+'</td><td class="n t-ok">'+n2(x.paid)+'</td><td class="n '+(Number(x.remaining)>0?'warn':'')+'"><b>'+n2(x.remaining)+'</b></td><td class="nw"><button class="btn sm primary th-pay" type="button"'+(Number(x.remaining)>0?'':' disabled')+'>دفع</button> <button class="btn sm th-edit" type="button">تعديل</button> <button class="btn sm danger th-del" type="button">حذف</button></td></tr>'; }).join(''):'<tr><td colspan="7" class="empty">لا يوجد معلمون بعد.</td></tr>')+'</tbody></table>'+
       '<h3 class="sec">دفعات هذا الشهر</h3><table class="imp"><tbody>'+
       (function(){ var a=monthRange(month), l=D.tpays.filter(function(x){return inRange(x.paid_on,a[0],a[1]);}); return l.length?l.map(function(x){ return '<tr><td dir="ltr">'+esc(x.paid_on)+'</td><td>'+esc(tn(x.teacher_id))+'</td><td class="n">'+n2(x.amount)+'</td><td>'+esc(x.note||'')+'</td><td><button class="btn sm th-rm" data-id="'+esc(x.id)+'" type="button">حذف</button></td></tr>'; }).join(''):'<tr><td class="empty">لا دفعات.</td></tr>'; })()+'</tbody></table>';
     var attHtml=(function(){
@@ -1320,13 +1320,13 @@ function openMoney(){
     function form(t){
       var tm=t?termOf(t.id):null;
       frm(box,'<label>الاسم<input name="name" required maxlength="80" value="'+esc(t?t.name:'')+'"></label><label>الهاتف<input name="ph" dir="ltr" maxlength="30" value="'+esc(t?t.phone:'')+'"></label>'+
-        '<label>نوع الأجر<select name="pt"><option value="percent"'+((!tm||tm.pay_type==='percent')?' selected':'')+'>نسبة من المحصّل %</option><option value="fixed"'+(tm&&tm.pay_type==='fixed'?' selected':'')+'>مبلغ ثابت شهرياً</option><option value="session"'+(tm&&tm.pay_type==='session'?' selected':'')+'>مبلغ لكل حصة</option></select></label>'+
-        '<label>القيمة (نسبة أو مبلغ أو سعر الحصة)<input name="rate" data-fmt="num" inputmode="decimal" autocomplete="off" required dir="ltr" value="'+(tm?esc(tm.rate):'')+'"></label>'+
+        '<label>نوع الأجر<select name="pt"><option value="percent"'+((!tm||tm.pay_type==='percent')?' selected':'')+'>نسبة من المحصّل %</option><option value="fixed"'+(tm&&tm.pay_type==='fixed'?' selected':'')+'>مبلغ ثابت شهرياً</option><option value="session"'+(tm&&tm.pay_type==='session'?' selected':'')+'>مبلغ لكل حصة</option><option value="none"'+(tm&&tm.pay_type==='none'?' selected':'')+'>بدون راتب (شريك يدرّس)</option></select></label>'+
+        '<label>القيمة (نسبة أو مبلغ أو سعر الحصة)<input name="rate" data-fmt="num" inputmode="decimal" autocomplete="off" dir="ltr" value="'+(tm?esc(tm.rate):'')+'"></label>'+
         '<label>يسري من تاريخ<input name="from" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="YYYY-MM-DD" autocomplete="off" dir="ltr" required value="'+esc(tm?today():today().slice(0,8)+'01')+'"></label>'+
         (t?'<label>الحالة<select name="act"><option value="1"'+(t.active?' selected':'')+'>يعمل</option><option value="0"'+(t.active?'':' selected')+'>متوقف</option></select></label>':''),
         async function(f,sid){
-          var name=f.name.value.trim(), rate=Number(f.rate.value), from=f.from.value, pt=f.pt.value;
-          if(!name||!(rate>=0)||!okDate(from)) throw lerr('تحقق من الاسم والقيمة والتاريخ.');
+          var name=f.name.value.trim(), pt=f.pt.value, rate=pt==='none'?0:Number(f.rate.value), from=f.from.value;
+          if(!name||!(rate>=0)||(pt!=='none'&&!f.rate.value.trim())||!okDate(from)) throw lerr('تحقق من الاسم والقيمة والتاريخ.');
           if(pt==='percent'&&rate>100) throw lerr('النسبة لا تزيد على 100.');
           var id=t?t.id:sid;
           if(t) await w('PATCH','/rest/v1/teachers?id=eq.'+id,{name:name,phone:f.ph.value.trim(),active:f.act.value==='1'});
@@ -2907,14 +2907,14 @@ function renderDetail(){
     return '<div class="item"><div class="i-main"><b>'+esc(s.course)+'</b><div class="sub">'+(sess?'حصة بتاريخ '+fmtDate(s.start):s.kind==='pack'?'باقة '+((s.sessionsTotal||0)+(s.sessionsAdjust||0))+' حصة · تبدأ '+fmtDate(s.start):'من '+fmtDate(s.start)+' إلى '+fmtDate(s.end)+' · '+esc(s.months||'')+' شهر')+(teacherName(s.teacherId)?' · '+esc(teacherName(s.teacherId)):'')+'</div>'+(s.kind==='pack'?packInfoHtml(s):'')+(s.subjects?'<div class="sub">المواد: '+esc(s.subjects)+'</div>':'')+(s.discount>0?'<div class="sub t-ok">خصم '+esc(money(s.discount))+(s.discountPct?' ('+esc(s.discountPct)+'%)':'')+' — '+esc(s.discountReason||'')+(s.discountBy?' · '+esc(s.discountBy):'')+'</div>':'')+'</div>'+
       '<div class="i-nums"><span>الرسوم '+esc(money(s.fee))+'</span><span>المدفوع '+esc(money(s.paid))+'</span><span class="'+(s.remaining>0?'t-crit':'')+'">المتبقي '+esc(money(s.remaining))+'</span></div>'+
       '<div class="i-act">'+pill+'<button class="btn sm" type="button" data-act="receipt" data-sub="'+esc(s.id)+'">إيصال</button>'+(s.remaining>0?'<button class="btn sm" type="button" data-act="panel" data-panel="pay" data-sub="'+esc(s.id)+'">دفعة</button>':'')+
-      (isOwner()?'<button class="btn sm" type="button" data-xact="sub-edit" data-id="'+esc(s.id)+'">تعديل</button>':'')+'<button class="btn sm danger" type="button" data-act="del-sub" data-id="'+esc(s.id)+'">حذف</button></div></div>';
+      (isOwner()?'<button class="btn sm" type="button" data-xact="sub-edit" data-id="'+esc(s.id)+'">تعديل</button>':'')+(isOwner()&&s.paid>0?'<button class="btn sm" type="button" data-xact="sub-refund" data-id="'+esc(s.id)+'">استرجاع</button>':'')+'<button class="btn sm danger" type="button" data-act="del-sub" data-id="'+esc(s.id)+'">حذف</button></div></div>';
   }).join(''):'<div class="sub">لا توجد اشتراكات. استخدم «تجديد الاشتراك» لإضافة اشتراك.</div>');
 
   var subById={}; r.subs.forEach(function(s){subById[s.id]=s;});
   $('#d-pays').innerHTML=r.pays.length?r.pays.map(function(p){
     var s=subById[p.subId];
     return '<div class="item"><div class="i-main"><b class="num">'+esc(mny(p.amount))+'</b><div class="sub">'+fmtDate(p.date)+(s?' · '+esc(s.course):'')+(p.method==='transfer'?' · <b>حوالة</b>':'')+(p.note?' · '+esc(p.note):'')+'</div></div>'+
-      '<div class="i-act">'+(s?'<button class="btn sm" type="button" data-act="receipt" data-sub="'+esc(s.id)+'">إيصال</button>':'')+(isOwner()?'<button class="btn sm" type="button" data-xact="pay-edit" data-id="'+esc(p.id)+'">تعديل</button>':'')+'<button class="btn sm danger" type="button" data-act="del-pay" data-id="'+esc(p.id)+'">حذف</button></div></div>';
+      '<div class="i-act">'+(s?'<button class="btn sm" type="button" data-act="receipt" data-sub="'+esc(s.id)+'">إيصال</button>':'')+(isOwner()&&p.amount>0?'<button class="btn sm" type="button" data-xact="pay-edit" data-id="'+esc(p.id)+'">تعديل</button>':'')+'<button class="btn sm danger" type="button" data-act="del-pay" data-id="'+esc(p.id)+'">حذف</button></div></div>';
   }).join(''):'<div class="sub">لا توجد دفعات بعد.</div>';
   renderDetailAtt(r);
 
@@ -3167,7 +3167,7 @@ function validateBackup(o){
   }
   for(i=0;i<o.payments.length;i++){
     var p=o.payments[i], amt=Number(p&&p.amount);
-    if(!p||!ID_RE.test(p.id||'')||pIds[p.id]||subOwner[p.subId]!==p.studentId||!isFinite(amt)||amt<=0||!isDate(p.date)){
+    if(!p||!ID_RE.test(p.id||'')||pIds[p.id]||subOwner[p.subId]!==p.studentId||!isFinite(amt)||amt===0||!isDate(p.date)){
       return {error:'سجل دفعة غير صالح في الملف (رقم '+(i+1)+').'};
     }
     pIds[p.id]=1;
@@ -4592,6 +4592,71 @@ function openPayEdit(id){
     '<div class="err" id="pe-err" role="alert"></div><div class="row"><button class="btn primary" type="submit">حفظ</button><button class="btn" type="button" data-xact="close">إلغاء</button></div></form>');
   o.__pay=p; o.__s=s;
 }
+
+/* ===== refund on withdrawal: price per day (or per session) x units used, the rest goes back ===== */
+function refundDaysPresent(sid,from,to){ var n=0; Object.keys(S.att||{}).forEach(function(d){ if(d>=from&&d<=to&&S.att[d]&&S.att[d][sid]==='p') n++; }); return n; }
+function openRefund(id){
+  var s=findSub(id); if(!s) return;
+  var row=null; D.rows.forEach(function(r){ r.subs.forEach(function(x){ if(x.id===id) row=r; }); });
+  var kind=s.kind==='session'?'session':s.kind==='pack'?'pack':'month';
+  var bag=/حقيبة/.test(s.course||'');
+  var o=xModal('استرجاع مبلغ — '+(row?row.st.name:''),
+    '<form id="f-refund" novalidate>'+
+    '<div class="kvs"><div class="kv"><span>الاشتراك</span><b>'+esc(s.course||'')+'</b></div><div class="kv"><span>الرسوم</span><b>'+esc(money(s.fee))+'</b></div><div class="kv"><span>المدفوع</span><b>'+esc(money(s.paid))+'</b></div></div>'+
+    '<div class="fgrid">'+
+    '<div class="field"><label>تاريخ الانسحاب</label><input id="rf-day" class="ltr dateinput" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off" value="'+esc(fmtDate(todayStr()))+'"></div>'+
+    (kind==='month'?'<div class="field"><label>احتساب الأيام</label><select id="rf-basis"><option value="all"'+(bag?' selected':'')+'>كل الأيام منذ البداية (حقيبة)</option><option value="att"'+(bag?'':' selected')+'>أيام الحضور المسجّلة فقط</option></select></div>':'')+
+    '<div class="field"><label>'+(kind==='month'?'عدد أيام الاشتراك':kind==='pack'?'عدد حصص الباقة':'عدد الحصص')+'</label><input id="rf-total" class="ltr" inputmode="numeric" readonly></div>'+
+    '<div class="field"><label>'+(kind==='month'?'الأيام المحتسبة':'الحصص المستهلكة')+'</label><input id="rf-used" class="ltr" inputmode="numeric"></div>'+
+    '</div>'+
+    '<div class="kvs" id="rf-calc"></div>'+
+    '<div class="fgrid"><div class="field"><label>المبلغ المسترد</label><input id="rf-amt" class="ltr" inputmode="decimal"></div>'+
+    '<div class="field"><label>طريقة الإرجاع</label><select id="rf-method"><option value="cash">نقداً</option><option value="transfer">حوالة</option></select></div>'+
+    '<div class="field wide"><label>ملاحظة</label><input id="rf-note" maxlength="120" placeholder="سبب الانسحاب"></div></div>'+
+    '<p class="hint">يُسجَّل المبلغ كدفعة بالسالب في تاريخ الانسحاب، فيخرج من دخل ذلك اليوم ومن حسابات المعلم والشركاء تلقائياً. وتُعدَّل رسوم الاشتراك لتساوي ما استُهلك'+(kind==='month'?'، ويُنهى الاشتراك في يوم الانسحاب':'')+'.</p>'+
+    '<div class="err" id="rf-err" role="alert"></div><div class="row"><button class="btn primary" type="submit">تأكيد الاسترجاع</button><button class="btn" type="button" data-xact="close">إلغاء</button></div></form>');
+  o.__sub=s; o.__row=row; o.__kind=kind; o.__touched=false;
+  refundCalc(o,true);
+}
+function refundCalc(o,fresh){
+  var s=o.__sub, row=o.__row, kind=o.__kind, $=function(i){ return document.getElementById(i); };
+  var day=parseDIn($('rf-day').value.trim()); if(!isDate(day)) day=todayStr();
+  var total, used;
+  if(kind==='month'){
+    total=Math.max(1,diffDays(s.end,s.start)+1);
+    var last=day<s.end?day:s.end, basis=($('rf-basis')||{}).value;
+    used=day<s.start?0:(basis==='all'?diffDays(last,s.start)+1:refundDaysPresent(row.st.id,s.start,last));
+  } else if(kind==='pack'){ total=Number(s.cap)||(Number(s.sessionsTotal)||0)+(Number(s.sessionsAdjust)||0)||1; used=Number(s.used)||0; }
+  else { total=1; used=(row&&refundDaysPresent(row.st.id,s.start,s.start))?1:0; }
+  $('rf-total').value=total;
+  if(fresh||!o.__usedTouched) $('rf-used').value=used;
+  var u=Math.max(0,Math.min(total,Number(latinDigits($('rf-used').value))||0));
+  var unit=s.fee/total, consumed=r3(Math.min(s.fee,unit*u)), back=Math.max(0,r3(s.paid-consumed));
+  o.__calc={total:total,used:u,unit:unit,consumed:consumed,back:back};
+  $('rf-calc').innerHTML='<div class="kv"><span>سعر '+(kind==='month'?'اليوم':'الحصة')+'</span><b>'+esc(money(r3(unit)))+'</b></div><div class="kv"><span>ما استُهلك ('+u+' × '+esc(money(r3(unit)))+')</span><b>'+esc(money(consumed))+'</b></div><div class="kv"><span>المبلغ المستحق للإرجاع</span><b class="'+(back>0?'t-ok':'bad')+'">'+esc(money(back))+'</b></div>'+(s.paid<consumed?'<p class="hint bad">الطالب دفع أقل مما استهلك؛ لا يوجد مبلغ يُسترد (المتبقي عليه '+esc(money(r3(consumed-s.paid)))+').</p>':'');
+  if(fresh||!o.__amtTouched) $('rf-amt').value=back>0?String(back):'';
+}
+document.addEventListener('input',function(e){
+  var t=e.target; if(!t||!t.id||t.id.indexOf('rf-')!==0) return; var o=document.getElementById('x-modal'); if(!o||!o.__calc&&!o.__sub) return;
+  if(t.id==='rf-used') o.__usedTouched=true; if(t.id==='rf-amt'){ o.__amtTouched=true; return; }
+  if(t.id==='rf-day'||t.id==='rf-used') refundCalc(o,false);
+});
+document.addEventListener('change',function(e){ var t=e.target; if(t&&t.id==='rf-basis'){ var o=document.getElementById('x-modal'); if(o){ o.__usedTouched=false; refundCalc(o,false); } } });
+async function submitRefund(form){
+  var o=document.getElementById('x-modal'), s=o&&o.__sub, err=document.getElementById('rf-err'), btn=form.querySelector('button[type=submit]'); if(!s) return;
+  var day=parseDIn(document.getElementById('rf-day').value.trim()), amt=parseAmt(document.getElementById('rf-amt').value), c=o.__calc||{consumed:s.fee};
+  if(!isDate(day)){ err.textContent='تاريخ الانسحاب غير صحيح.'; return; }
+  if(isNaN(amt)||amt<=0){ err.textContent='اكتب مبلغاً مستحقاً للإرجاع أكبر من صفر.'; return; }
+  if(amt>s.paid){ err.textContent='المبلغ أكبر من المدفوع ('+money(s.paid)+').'; return; }
+  btn.disabled=true; err.textContent='';
+  try{
+    if(!(await confirmClosedDay(day))){ btn.disabled=false; return; }
+    var body={p_sub:s.id,p_amount:amt,p_day:day,p_method:document.getElementById('rf-method').value,p_note:document.getElementById('rf-note').value.trim(),p_new_fee:r3(Math.max(c.consumed,0))};
+    if(o.__kind==='month') body.p_end=day<s.start?s.start:day;
+    await window.NOON_API.guarded('استرجاع',['payments','subs'],function(){ return window.NOON_API.http('POST','/rest/v1/rpc/refund_subscription',{body:body}); });
+    closeX(); toast('تم تسجيل الاسترجاع');
+  }catch(x){ err.textContent='تعذر الاسترجاع: '+errMsg(x); btn.disabled=false; }
+}
 async function submitPayEdit(form){
   var o=document.getElementById('x-modal'), p=o&&o.__pay, s=o&&o.__s, err=document.getElementById('pe-err'), btn=form.querySelector('button[type=submit]'); if(!p) return;
   var amt=parseAmt(document.getElementById('pe-amt').value), date=parseDIn(document.getElementById('pe-date').value.trim());
@@ -4609,9 +4674,11 @@ document.addEventListener('click',function(e){
   var el=e.target.closest&&e.target.closest('[data-xact]'); if(!el) return;
   if(el.dataset.xact==='sub-edit') openSubEdit(el.dataset.id);
   else if(el.dataset.xact==='pay-edit') openPayEdit(el.dataset.id);
+  else if(el.dataset.xact==='sub-refund') openRefund(el.dataset.id);
 });
 document.addEventListener('submit',function(e){
   if(e.target.id==='f-subedit'){ e.preventDefault(); submitSubEdit(e.target); }
+  if(e.target.id==='f-refund'){ e.preventDefault(); submitRefund(e.target); }
   else if(e.target.id==='f-payedit'){ e.preventDefault(); submitPayEdit(e.target); }
 });
 
