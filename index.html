@@ -4127,20 +4127,22 @@ function receiptWaText(m){
   L.push('إجمالي الرسوم: '+money(m.fee)+' '+m.cur,'المدفوع: '+money(m.paid)+' '+m.cur,rem>0?'المتبقي: '+money(rem)+' '+m.cur:(rem<0?'الرصيد: زيادة '+money(-rem)+' '+m.cur:'الحساب مسدّد بالكامل ✅'),'','شكراً لكم.');
   return L.join('\n');
 }
-async function sendReceiptWa(){
+function sendReceiptWa(){
   var r=S.rc&&D.byId[S.rc.sid]; if(!r) return;
-  var cv=await renderReceipt(); if(!cv) return; var m=RC.model, text=receiptWaText(m);
-  try{
-    if(navigator.canShare&&navigator.share){
-      var blob=await new Promise(function(res){ cv.toBlob(res,'image/jpeg',0.92); });
-      var f=blob&&new File([blob],'إيصال-'+m.no+'.jpg',{type:'image/jpeg'});
-      if(f&&navigator.canShare({files:[f]})){ await navigator.share({files:[f],text:text,title:'إيصال '+m.no}); return; }
-    }
-  }catch(e){ if(e&&e.name==='AbortError') return; }
+  var m=RC.model||receiptModel(); if(!m) return;
   var p=waPhone(r); if(!p){ toast('لا يوجد رقم هاتف لهذا الطالب'); return; }
-  window.open('https://wa.me/'+p+'?text='+encodeURIComponent(text),'_blank','noopener');
+  window.open('https://wa.me/'+p+'?text='+encodeURIComponent(receiptWaText(m)),'_blank','noopener');
 }
-(function(){ var row=document.querySelector('#rcpt .row:last-of-type'); if(row&&!document.getElementById('rcpt-wa')){ var b=document.createElement('button'); b.type='button'; b.className='btn wa'; b.id='rcpt-wa'; b.dataset.xact='rcpt-wa'; b.textContent='إرسال عبر واتساب'; row.insertBefore(b,row.firstChild); } })();
+async function shareReceiptImg(){
+  var cv=await renderReceipt(); if(!cv) return; var m=RC.model;
+  try{
+    var blob=await new Promise(function(res){ cv.toBlob(res,'image/jpeg',0.92); });
+    var f=new File([blob],'إيصال-'+m.no+'.jpg',{type:'image/jpeg'});
+    if(navigator.canShare&&navigator.canShare({files:[f]})) await navigator.share({files:[f],title:'إيصال '+m.no});
+    else toast('مشاركة الصورة غير مدعومة في هذا الجهاز');
+  }catch(e){ if(!(e&&e.name==='AbortError')) toast('تعذرت المشاركة'); }
+}
+(function(){ var row=document.querySelector('#rcpt .row:last-of-type'); if(row&&!document.getElementById('rcpt-wa')){ var b=document.createElement('button'); b.type='button'; b.className='btn wa'; b.id='rcpt-wa'; b.dataset.xact='rcpt-wa'; b.textContent='إرسال إلى واتساب ولي الأمر'; row.insertBefore(b,row.firstChild); var c=document.createElement('button'); c.type='button'; c.className='btn'; c.id='rcpt-img'; c.dataset.xact='rcpt-img'; c.textContent='مشاركة الصورة'; c.hidden=!(navigator.canShare&&navigator.share); row.insertBefore(c,b.nextSibling); } })();
 document.addEventListener('click',function(e){
   var el=e.target.closest&&e.target.closest('[data-xact],[data-xtab]'); if(!el) return;
   var t=el.dataset.xtab;
@@ -4148,6 +4150,7 @@ document.addEventListener('click',function(e){
   var a=el.dataset.xact, id=el.dataset.id;
   if(a==='close') closeX();
   else if(a==='rcpt-wa') sendReceiptWa();
+  else if(a==='rcpt-img') shareReceiptImg();
   else if(a==='gs-open'){ var q=document.getElementById('gs-q'); if(q) q.value=''; var bx=document.getElementById('gs-res'); if(bx) bx.hidden=true; openDetail(id); }
   else if(a==='qp-pick'){ closeX(); openDetail(id,{panel:'pay'}); }
   else if(a==='quickpay') quickPay();
