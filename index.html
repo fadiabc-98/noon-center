@@ -1566,7 +1566,7 @@ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded'
 </script>
 <title>مركز نون</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=El+Messiri:wght@500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@500;600;700&family=Tajawal:wght@400;500;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
 <style>
 /* Layout: fixed navy sidebar (brand, five sections, storage and backup status) on the right, working area on the left.
    On phones the sidebar becomes a top band with a scrolling nav. Student details open in a modal. */
@@ -1577,7 +1577,7 @@ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded'
   --ok:#17703F; --ok-bg:#DCF1E3; --warn:#85530A; --warn-bg:#FAEBC9; --crit:#B3261E; --crit-bg:#FBE1DE; --mute-bg:#ECE8DA;
   --overlay:rgba(8,24,22,.62); --shadow:0 1px 2px rgba(60,45,10,.05),0 8px 24px rgba(13,46,45,.07);
   --font:'IBM Plex Sans Arabic','Tajawal','Segoe UI',Tahoma,system-ui,sans-serif;
-  --display:'El Messiri','IBM Plex Sans Arabic','Cairo',Tahoma,sans-serif;
+  --display:'Reem Kufi','El Messiri','IBM Plex Sans Arabic',Tahoma,sans-serif;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
@@ -1911,6 +1911,43 @@ body.modal-open{overflow:hidden}
 .side>*{flex-shrink:0}
 .side{overscroll-behavior:contain}
 @media (max-height:820px){.side{gap:12px;padding-top:14px}.tab-btn{padding:.5em .8em}}
+
+/* ===== modern open animation ===== */
+@keyframes nFade{from{opacity:0}to{opacity:1}}
+@keyframes nPop{from{opacity:0;transform:translateY(22px) scale(.965)}to{opacity:1;transform:none}}
+@keyframes nSheet{from{transform:translateY(100%)}to{transform:none}}
+.overlay:not([hidden]),.noon-modal,#x-modal{animation:nFade .22s ease-out both;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+.overlay:not([hidden]) .modal,.noon-modal .box{animation:nPop .34s cubic-bezier(.2,.9,.25,1.04) both;will-change:transform,opacity}
+.overlay.sheet:not([hidden]) .modal{animation:nSheet .38s cubic-bezier(.22,1,.36,1) both}
+@media (max-width:700px){.overlay:not(.sheet):not([hidden]) .modal,.noon-modal .box{animation:nSheet .36s cubic-bezier(.22,1,.36,1) both}}
+.modal,.noon-modal .box{box-shadow:0 30px 80px rgba(6,26,24,.35)}
+.btn,.tab-btn,.linklike,.arow,.tbl tbody tr{transition:background-color .18s ease,color .18s ease,transform .12s ease,box-shadow .18s ease}
+.btn:active{transform:scale(.97)}
+
+/* ===== fonts ===== */
+.topbar h1,.panel-head h2,.m-head h2,.noon-modal .hd,.brand-name,.stat-n,.gate-card h2,.kv b,.h3{font-family:var(--display);font-weight:700;letter-spacing:.2px}
+.topbar h1{font-size:31px}
+.panel-head h2{font-size:21px}
+.m-head h2{font-size:25px}
+.linklike,.agrid .nm,.att-row .linklike,.a-main{font-family:'Tajawal','IBM Plex Sans Arabic',sans-serif}
+.linklike{font-weight:800;font-size:17px}
+
+/* ===== student rows: soft mint, in harmony with the green sidebar ===== */
+:root{--row:#E7F1ED;--row2:#DDEBE6;--row-hover:#CFE5DD;--row-fg:#0C3430;--row-fg-hover:#0B6B5F;--row-line:#C9DDD5}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--row:#15302C;--row2:#122925;--row-hover:#1D4540;--row-fg:#DDF1EC;--row-fg-hover:#8CE8D9;--row-line:#24453F}}
+:root[data-theme="dark"]{--row:#15302C;--row2:#122925;--row-hover:#1D4540;--row-fg:#DDF1EC;--row-fg-hover:#8CE8D9;--row-line:#24453F}
+.arow,.att-row{background:var(--row);border-bottom-color:var(--row-line)}
+.arow:nth-child(even),.att-row:nth-child(even){background:var(--row2)}
+.arow:hover,.att-row:hover{background:var(--row-hover)}
+.tbl tbody tr[data-id],.tbl tbody tr:has(.linklike){background:var(--row)}
+.tbl tbody tr[data-id]:nth-child(even),.tbl tbody tr:has(.linklike):nth-child(even){background:var(--row2)}
+html .tbl tbody tr[data-id]:hover,html .tbl tbody tr:has(.linklike):hover{background:var(--row-hover)}
+.tbl tbody tr[data-id] td,.tbl tbody tr:has(.linklike) td{border-bottom-color:var(--row-line)}
+.linklike{color:var(--row-fg);text-decoration:none!important}
+.arow:hover .linklike,.att-row:hover .linklike,.tbl tbody tr:hover .linklike,.linklike:hover{color:var(--row-fg-hover);text-decoration:none!important}
+.arow:hover .linklike,.tbl tbody tr:hover .linklike{transform:translateX(-3px)}
+.agrid .nm{background:var(--row)}
+.agrid tbody tr:hover .nm{background:var(--row-hover)}
 
 /* ===== refined theme: ivory + deep green + logo gold ===== */
 body{font-feature-settings:"lnum" 1,"tnum" 1;-webkit-font-smoothing:antialiased;letter-spacing:.005em}
