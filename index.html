@@ -1566,7 +1566,7 @@ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded'
 </script>
 <title>مركز نون</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@500;600;700&family=Tajawal:wght@400;500;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
 <style>
 /* Layout: fixed navy sidebar (brand, five sections, storage and backup status) on the right, working area on the left.
    On phones the sidebar becomes a top band with a scrolling nav. Student details open in a modal. */
@@ -1577,7 +1577,7 @@ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded'
   --ok:#17703F; --ok-bg:#DCF1E3; --warn:#85530A; --warn-bg:#FAEBC9; --crit:#B3261E; --crit-bg:#FBE1DE; --mute-bg:#ECE8DA;
   --overlay:rgba(8,24,22,.62); --shadow:0 1px 2px rgba(60,45,10,.05),0 8px 24px rgba(13,46,45,.07);
   --font:'IBM Plex Sans Arabic','Tajawal','Segoe UI',Tahoma,system-ui,sans-serif;
-  --display:'Reem Kufi','El Messiri','IBM Plex Sans Arabic',Tahoma,sans-serif;
+  --display:'Cairo','IBM Plex Sans Arabic',Tahoma,sans-serif;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
@@ -1788,7 +1788,7 @@ input[type=file]{padding:.45em}
 
 /* tablet and phone: sidebar becomes a top band */
 .rcpt{z-index:35}
-.rcpt-modal{width:min(560px,100%)}
+.rcpt-modal{width:min(500px,100%)}
 .rcpt-paper canvas{width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:8px;background:#fff}
 .gate{position:fixed;inset:0;z-index:40;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
 .gate.over{background:var(--overlay)}
@@ -1898,9 +1898,10 @@ body.modal-open{overflow:hidden}
 .overlay,.noon-modal,#x-modal{overscroll-behavior:contain}
 .m-back{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--surface2);color:var(--fg);border-radius:999px;padding:7px 14px 7px 10px;font:600 14px var(--font);cursor:pointer;margin-inline-end:10px;flex:none}
 .m-back:hover{border-color:var(--gold)}
-.overlay:not(.sheet) .modal{width:min(1100px,100%)!important}
+@media (min-width:701px){.overlay:not(.sheet) .modal{width:fit-content!important;min-width:min(400px,100%);max-width:min(760px,100%)}.overlay.rcpt .modal{width:min(500px,100%)!important;min-width:0}
+.noon-modal .box{width:fit-content;min-width:min(440px,100%);max-width:min(680px,100%)}.noon-modal.wide .box{min-width:min(880px,100%);max-width:min(1100px,100%)}}
 .overlay:not(.sheet){padding-block:12px}
-.noon-modal .box{max-height:96vh;width:min(1100px,100%)}
+.noon-modal .box{max-height:96vh}
 .noon-modal{padding:8px}
 .noon-modal .hd .x,.m-head .m-close{flex:none}
 @media (max-width:700px){
@@ -1926,11 +1927,8 @@ body.modal-open{overflow:hidden}
 
 /* ===== fonts ===== */
 .topbar h1,.panel-head h2,.m-head h2,.noon-modal .hd,.brand-name,.stat-n,.gate-card h2,.kv b,.h3{font-family:var(--display);font-weight:700;letter-spacing:.2px}
-.topbar h1{font-size:31px}
-.panel-head h2{font-size:21px}
-.m-head h2{font-size:25px}
-.linklike,.agrid .nm,.att-row .linklike,.a-main{font-family:'Tajawal','IBM Plex Sans Arabic',sans-serif}
-.linklike{font-weight:800;font-size:17px}
+.linklike,.agrid .nm,.att-row .linklike{font-family:Arial,Tahoma,sans-serif}
+.linklike{font-weight:700}
 
 /* ===== student rows: soft mint, in harmony with the green sidebar ===== */
 :root{--row:#E7F1ED;--row2:#DDEBE6;--row-hover:#CFE5DD;--row-fg:#0C3430;--row-fg-hover:#0B6B5F;--row-line:#C9DDD5}
@@ -1948,6 +1946,25 @@ html .tbl tbody tr[data-id]:hover,html .tbl tbody tr:has(.linklike):hover{backgr
 .arow:hover .linklike,.tbl tbody tr:hover .linklike{transform:translateX(-3px)}
 .agrid .nm{background:var(--row)}
 .agrid tbody tr:hover .nm{background:var(--row-hover)}
+
+/* ===== type scale ===== */
+html body{font-size:15px}
+html .topbar h1{font-size:26px;font-weight:700}
+html .panel-head h2,html .m-head h2,html .noon-modal .hd,html .noon-modal h3.sec,html .h3,html .gate-card h2,html .td-g h3{font-size:19px;font-weight:700}
+html .noon-modal h3.sec{font-size:18px}
+html .tbl th,html .imp th,html .agrid th{font-size:14.5px;font-weight:700}
+html .tbl td,html .imp td,html .noon-modal td{font-size:14.5px}
+html .linklike{font-size:15px}
+html .tbl td.n,html .tbl .num,html .num,html .imp td.n,html .noon-modal td.n{font-size:15.5px;font-weight:700}
+html .sub,html .hint,html small,html .tbl td .sub{font-size:12.5px}
+html .btn,html .tab-btn,html .bnav button,html .m-back,html .noon-modal button{font-size:14.5px}
+html .btn.sm{font-size:13.5px}
+html .stat-n{font-size:24px}
+html .noon-modal .bd{font-size:14.5px}
+html .brand-name{font-size:19px}
+
+.btn.wa{background:#1FA855;border-color:#1FA855;color:#fff;font-weight:700}.btn.wa:hover{background:#188a46}
+#rcpt .row{flex-wrap:wrap;gap:8px}
 
 /* ===== refined theme: ivory + deep green + logo gold ===== */
 body{font-feature-settings:"lnum" 1,"tnum" 1;-webkit-font-smoothing:antialiased;letter-spacing:.005em}
@@ -3484,7 +3501,7 @@ function receiptModel(){
   return {no:receiptNo(s),center:S.settings.centerName,cur:S.settings.currency,name:r.st.name,course:s.course||'',session:s.kind==='session',start:s.start,end:s.end,months:s.months,fee:s.fee,paid:s.paid,remaining:s.remaining,pays:pays,today:todayStr(),pack:s.kind==='pack'?{total:(Number(s.sessionsTotal)||0)+(Number(s.sessionsAdjust)||0),left:s.left}:null,subjects:s.subjects||'',discount:Number(s.discount)||0,discountPct:s.discountPct||0,discountReason:s.discountReason||'',discountBy:s.discountBy||''};
 }
 function drawReceipt(m){
-  var W=RC.W, SC=RC.SC, rows=Math.max(m.pays.length,1), H=Math.max(1560,706+rows*58+440)+(m.subjects?130:0), dy=m.subjects?130:0;
+  var W=RC.W, SC=RC.SC, rows=Math.max(m.pays.length,1), H=706+rows*58+440+(m.subjects?130:0), dy=m.subjects?130:0;
   var cv=document.createElement('canvas'); cv.width=Math.round(W*SC); cv.height=Math.round(H*SC);
   var c=cv.getContext('2d'); c.scale(SC,SC); c.direction='rtl';
   c.fillStyle='#fff'; c.fillRect(0,0,W,H);
@@ -3541,7 +3558,7 @@ function drawReceipt(m){
   var last=m.pays.length?m.pays[m.pays.length-1].date:'';
   T(rem>0?m.cur:(last?'آخر دفعة: '+fmtDate(last):''),sx+sw/2,top+152,26,500,MU,'center');
   // signature + note
-  var sy=top+200+120; c.strokeStyle=INK; c.lineWidth=2; c.beginPath(); c.moveTo(M,sy); c.lineTo(M+380,sy); c.stroke();
+  var sy=top+200+90; c.strokeStyle=INK; c.lineWidth=2; c.beginPath(); c.moveTo(M,sy); c.lineTo(M+380,sy); c.stroke();
   T('توقيع المستلم',M+190,sy+36,24,500,MU,'center');
   c.restore();
   T('رقم الإيصال ثابت، وتتحدّث بياناته عند تسجيل أي دفعة جديدة.',W/2,H-44,22,500,MU,'center');
@@ -4100,12 +4117,37 @@ function openMore(){
   o.classList.add('sheet'); o.__rows=rows;
 }
 
+
+/* ===== send the receipt to WhatsApp ===== */
+function receiptWaText(m){
+  var rem=m.remaining, last=m.pays.length?m.pays[m.pays.length-1]:null;
+  var L=['السلام عليكم ورحمة الله وبركاته،','إيصال دفع رقم '+m.no+' من '+m.center,'الطالب/ة: '+m.name];
+  if(m.course) L.push('الدورة: '+m.course);
+  if(last) L.push('آخر دفعة: '+money(last.amount)+' '+m.cur+' بتاريخ '+fmtDate(last.date));
+  L.push('إجمالي الرسوم: '+money(m.fee)+' '+m.cur,'المدفوع: '+money(m.paid)+' '+m.cur,rem>0?'المتبقي: '+money(rem)+' '+m.cur:(rem<0?'الرصيد: زيادة '+money(-rem)+' '+m.cur:'الحساب مسدّد بالكامل ✅'),'','شكراً لكم.');
+  return L.join('\n');
+}
+async function sendReceiptWa(){
+  var r=S.rc&&D.byId[S.rc.sid]; if(!r) return;
+  var cv=await renderReceipt(); if(!cv) return; var m=RC.model, text=receiptWaText(m);
+  try{
+    if(navigator.canShare&&navigator.share){
+      var blob=await new Promise(function(res){ cv.toBlob(res,'image/jpeg',0.92); });
+      var f=blob&&new File([blob],'إيصال-'+m.no+'.jpg',{type:'image/jpeg'});
+      if(f&&navigator.canShare({files:[f]})){ await navigator.share({files:[f],text:text,title:'إيصال '+m.no}); return; }
+    }
+  }catch(e){ if(e&&e.name==='AbortError') return; }
+  var p=waPhone(r); if(!p){ toast('لا يوجد رقم هاتف لهذا الطالب'); return; }
+  window.open('https://wa.me/'+p+'?text='+encodeURIComponent(text),'_blank','noopener');
+}
+(function(){ var row=document.querySelector('#rcpt .row:last-of-type'); if(row&&!document.getElementById('rcpt-wa')){ var b=document.createElement('button'); b.type='button'; b.className='btn wa'; b.id='rcpt-wa'; b.dataset.xact='rcpt-wa'; b.textContent='إرسال عبر واتساب'; row.insertBefore(b,row.firstChild); } })();
 document.addEventListener('click',function(e){
   var el=e.target.closest&&e.target.closest('[data-xact],[data-xtab]'); if(!el) return;
   var t=el.dataset.xtab;
   if(t){ if(t==='more'){ openMore(); return; } var b=document.querySelector('.nav .tab-btn[data-tab="'+t+'"]'); if(b) b.click(); window.scrollTo(0,0); return; }
   var a=el.dataset.xact, id=el.dataset.id;
   if(a==='close') closeX();
+  else if(a==='rcpt-wa') sendReceiptWa();
   else if(a==='gs-open'){ var q=document.getElementById('gs-q'); if(q) q.value=''; var bx=document.getElementById('gs-res'); if(bx) bx.hidden=true; openDetail(id); }
   else if(a==='qp-pick'){ closeX(); openDetail(id,{panel:'pay'}); }
   else if(a==='quickpay') quickPay();
