@@ -561,7 +561,7 @@ function openImport(source,label){
   var ov=document.createElement('div'); ov.className='noon-modal';
   ov.innerHTML='<div class="box" role="dialog" aria-modal="true"><div class="hd"><b>استيراد ملف نسخة احتياطية</b><button type="button" class="x" aria-label="إغلاق">×</button></div><div class="bd" id="imp-body">جارٍ قراءة الملف…</div></div>';
   document.body.appendChild(ov);
-  var body=ov.querySelector('#imp-body'), file=null, mode='merge', busy=false;
+  var body=ov.querySelector('#imp-body'), file=null, mode='merge', busy=false, ownerPart=null;
   function close(){ if(!busy) ov.remove(); }
   ov.querySelector('.x').onclick=close;
   function counts(c){
@@ -580,6 +580,12 @@ function openImport(source,label){
       body.innerHTML=h; bindModes(); return;
     }
     h+=counts(rep.counts);
+    if(ownerPart){
+      var orep=null; try{ orep=await rpc('owner_import',{p:ownerPart,p_dry:true}); }catch(e){ orep={ok:false,errors:[friendly(e).message]}; }
+      if(!orep.ok){ h+='<p class="bad"><b>جداول المالك في الملف:</b> '+esc((orep.errors||[]).join(' '))+'</p>'; }
+      else{ var OL={employees:'الموظفون',employee_salaries:'رواتب الموظفين',advances:'السلف',salary_payments:'دفع الرواتب',expenses:'المصروفات',teachers:'المعلمون',teacher_terms:'أجور المعلمين',teacher_payments:'دفعات المعلمين',inquiries:'الاستفسارات',cash_closings:'إقفال الصندوق'};
+        h+='<p class="sub"><b>جداول المالك في الملف (تُدمج: يُضاف الناقص فقط ولا يُستبدل شيء، في كل الأوضاع):</b></p><table class="imp"><thead><tr><th></th><th>في الملف</th><th>جديد</th></tr></thead><tbody>'+Object.keys(OL).map(function(k){ var o=orep.counts[k]||{file:0,new:0}; return '<tr><td>'+OL[k]+'</td><td>'+o.file+'</td><td>'+o['new']+'</td></tr>'; }).join('')+'</tbody></table>'; }
+    }
     if(rep.already_imported_file) h+='<p class="warn">هذا الملف سبق استيراده. الدمج لن يكرر أي سجل.</p>';
     if(rep.conflicts&&rep.conflicts.length) h+='<p class="warn"><b>تعارضات ('+rep.conflicts.length+') لن تُكتب:</b></p><ul class="warn">'+rep.conflicts.slice(0,8).map(function(x){return '<li>'+esc(x.kind)+' — '+esc(JSON.stringify(x))+'</li>';}).join('')+(rep.conflicts.length>8?'<li>…</li>':'')+'</ul>';
     if(rep.possible_duplicates&&rep.possible_duplicates.length) h+='<p class="warn"><b>أسماء قد تكون مكررة ('+rep.possible_duplicates.length+'):</b> '+rep.possible_duplicates.slice(0,6).map(function(x){return esc(x.file_student);}).join('، ')+'. ستُضاف، راجعها بعد الاستيراد.</p>';
@@ -599,6 +605,11 @@ function openImport(source,label){
         if(!(window.__app&&window.__app.downloadBackup)) throw mkErr('x','تعذر إنشاء نسخة الأمان.');
         var ok=await window.__app.downloadBackup(); if(ok===false) throw mkErr('x','لم تُحفظ نسخة الأمان.');
       }
+      if(ownerPart){
+        msg.textContent='جارٍ استعادة جداول المالك…';
+        var orr=await rpc('owner_import',{p:ownerPart,p_dry:false});
+        if(!orr.ok) throw mkErr('x',(orr.errors||['تعذرت استعادة جداول المالك.']).join(' '));
+      }
       msg.textContent='جارٍ الاستيراد…';
       var rep=await rpc('import_backup',{p:file,p_mode:mode,p_dry:false,p_confirm:mode==='replace'?'REPLACE':null});
       if(!rep.ok){ body.innerHTML='<p class="bad"><b>لم يتغير شيء:</b></p><ul class="bad">'+(rep.errors||[]).map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>'; busy=false; return; }
@@ -616,6 +627,7 @@ function openImport(source,label){
         if(source.size>15*1024*1024) throw new Error('big');
         file=JSON.parse(String(await source.text()).replace(/^﻿/,''));
       }
+      ownerPart=(file&&file.owner&&typeof file.owner==='object')?file.owner:null;
       mode=(cache.students.length+cache.subs.length+cache.payments.length===0)?'empty':'merge';
       await preview();
     }catch(e){ body.innerHTML='<p class="bad">تعذر قراءة الملف. تأكد أنه ملف نسخة احتياطية نزّلته من هذا النظام.</p>'; }
@@ -1307,7 +1319,7 @@ window.claude={use:async function(n){
   if(n==='downloads'){ var d=await localClaude.use('downloads'); return wrapDownloads(d); }
   return null;
 }};
-window.CLOUD={role:null,openImport:openImport,syncNow:syncNow,openLog:openLog,status:function(){return pill&&pill.dataset.state;},cache:cache};
+window.CLOUD={role:null,ownerExtras:function(){ return window.CLOUD.role==='owner'?rpc('owner_export',{}):Promise.resolve(null); },openImport:openImport,syncNow:syncNow,openLog:openLog,status:function(){return pill&&pill.dataset.state;},cache:cache};
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',injectUi); else injectUi();
 })();
 
@@ -1813,7 +1825,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 
       <div class="panel bk-card">
         <div class="panel-head"><h2>نسخة على جهازك</h2></div>
         <div class="bk-body">
-          <p>ملف واحد فيه كل الطلبة والاشتراكات والدفعات والإعدادات. هذه أهم حماية لأنها خارج النظام. احفظها مرة في الأسبوع على الأقل، وانسخ الملف إلى فلاشة أو أرسله إلى بريدك الإلكتروني.</p>
+          <p>ملف واحد فيه كل الطلبة والاشتراكات والدفعات والإعدادات، ويضم للمالك أيضاً المصروفات والموظفين والرواتب والمعلمين والاستفسارات وإقفالات الصندوق. هذه أهم حماية لأنها خارج النظام. احفظها مرة في الأسبوع على الأقل، وانسخ الملف إلى فلاشة أو أرسله إلى بريدك الإلكتروني.</p>
           <div class="row"><button class="btn primary" type="button" id="btn-bk-download" data-act="bk-download">تنزيل نسخة احتياطية كاملة</button><span class="hint" id="bk-nodl" hidden>التنزيل غير متاح في هذا العرض. افتح الصفحة من حسابك على Claude.</span></div>
         </div>
       </div>
@@ -2742,6 +2754,10 @@ async function downloadBackup(){
   if(!S.downloads){ toast('التنزيل غير متاح في هذا العرض'); return false; }
   if(!dataReady()){ toast('انتظر اكتمال تحميل البيانات ثم أعد المحاولة'); return false; }
   var b=buildBackup();
+  if(window.CLOUD&&window.CLOUD.ownerExtras){
+    try{ var ox=await window.CLOUD.ownerExtras(); if(ox) b.owner=ox; }
+    catch(e){ toast('تعذر تضمين جداول المالك في النسخة، لم يُحفظ الملف. تحقق من الاتصال وأعد المحاولة.'); return false; }
+  }
   try{
     await S.downloads.save({filename:'student-backup-'+todayStr()+'.json',data:JSON.stringify(b)});
   }catch(e){ if(e&&e.code==='declined') return false; toast(e&&e.code==='audit_failed'?e.message:'تعذر حفظ الملف'); return false; }
