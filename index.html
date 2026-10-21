@@ -2907,7 +2907,7 @@ function renderDetail(){
     return '<div class="item"><div class="i-main"><b>'+esc(s.course)+'</b><div class="sub">'+(sess?'حصة بتاريخ '+fmtDate(s.start):s.kind==='pack'?'باقة '+((s.sessionsTotal||0)+(s.sessionsAdjust||0))+' حصة · تبدأ '+fmtDate(s.start):'من '+fmtDate(s.start)+' إلى '+fmtDate(s.end)+' · '+esc(s.months||'')+' شهر')+(teacherName(s.teacherId)?' · '+esc(teacherName(s.teacherId)):'')+'</div>'+(s.kind==='pack'?packInfoHtml(s):'')+(s.subjects?'<div class="sub">المواد: '+esc(s.subjects)+'</div>':'')+(s.discount>0?'<div class="sub t-ok">خصم '+esc(money(s.discount))+(s.discountPct?' ('+esc(s.discountPct)+'%)':'')+' — '+esc(s.discountReason||'')+(s.discountBy?' · '+esc(s.discountBy):'')+'</div>':'')+'</div>'+
       '<div class="i-nums"><span>الرسوم '+esc(money(s.fee))+'</span><span>المدفوع '+esc(money(s.paid))+'</span><span class="'+(s.remaining>0?'t-crit':'')+'">المتبقي '+esc(money(s.remaining))+'</span></div>'+
       '<div class="i-act">'+pill+'<button class="btn sm" type="button" data-act="receipt" data-sub="'+esc(s.id)+'">إيصال</button>'+(s.remaining>0?'<button class="btn sm" type="button" data-act="panel" data-panel="pay" data-sub="'+esc(s.id)+'">دفعة</button>':'')+
-      (isOwner()?'<button class="btn sm" type="button" data-xact="sub-edit" data-id="'+esc(s.id)+'">تعديل</button>':'')+(isOwner()&&s.paid>0?'<button class="btn sm" type="button" data-xact="sub-refund" data-id="'+esc(s.id)+'">استرجاع</button>':'')+'<button class="btn sm danger" type="button" data-act="del-sub" data-id="'+esc(s.id)+'">حذف</button></div></div>';
+      (isOwner()?'<button class="btn sm" type="button" data-xact="sub-edit" data-id="'+esc(s.id)+'">تعديل</button>':'')+(isOwner()?'<button class="btn sm" type="button" data-xact="sub-refund" data-id="'+esc(s.id)+'">استرجاع</button>':'')+'<button class="btn sm danger" type="button" data-act="del-sub" data-id="'+esc(s.id)+'">حذف</button></div></div>';
   }).join(''):'<div class="sub">لا توجد اشتراكات. استخدم «تجديد الاشتراك» لإضافة اشتراك.</div>');
 
   var subById={}; r.subs.forEach(function(s){subById[s.id]=s;});
@@ -4597,6 +4597,7 @@ function openPayEdit(id){
 function refundDaysPresent(sid,from,to){ var n=0; Object.keys(S.att||{}).forEach(function(d){ if(d>=from&&d<=to&&S.att[d]&&S.att[d][sid]==='p') n++; }); return n; }
 function openRefund(id){
   var s=findSub(id); if(!s) return;
+  if(!(s.paid>0)){ toast('لا يوجد مبلغ مدفوع على هذا الاشتراك لاسترجاعه'); return; }
   var row=null; D.rows.forEach(function(r){ r.subs.forEach(function(x){ if(x.id===id) row=r; }); });
   var kind=s.kind==='session'?'session':s.kind==='pack'?'pack':'month';
   var bag=/حقيبة/.test(s.course||'');
