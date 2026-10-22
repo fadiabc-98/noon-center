@@ -259,6 +259,21 @@ function applyRole(){
   document.documentElement.classList.toggle('role-staff',role==='staff');
   document.documentElement.classList.toggle('role-owner',role!=='staff');
 }
+/* auto-lock: after N minutes without any use the session ends and the password is asked again */
+(function(){
+  var last=Date.now(); function poke(){ last=Date.now(); }
+  ['mousemove','mousedown','keydown','touchstart','wheel','scroll'].forEach(function(ev){ document.addEventListener(ev,poke,{passive:true,capture:true}); });
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden) check(); });
+  function check(){
+    if(!session) return;
+    var st=(cache.settings&&cache.settings.data)||{}, m=st.lockMin==null?15:Number(st.lockMin);
+    if(!(m>0)||Date.now()-last<m*60000) return;
+    last=Date.now(); try{ lsSet('noon-locked-msg','قُفلت المنظومة تلقائياً بعد '+m+' دقيقة دون استخدام. أدخل كلمة المرور للمتابعة.'); }catch(e){}
+    signOut();
+  }
+  setInterval(check,15000);
+  window.NOON_IDLE={poke:poke,check:check,_set:function(t){ last=t; }};
+})();
 async function signOut(){
   try{ if(session) await http('POST','/auth/v1/logout?scope=local',{timeout:5000}); }catch(e){}
   saveSession(null); location.reload();
@@ -310,6 +325,7 @@ function ensureLoginEl(){
   return el;
 }
 function showLogin(message){
+  try{ var lm=lsGet('noon-locked-msg'); if(lm){ lsSet('noon-locked-msg',null); if(!message) message=lm; } }catch(e){}
   var el=ensureLoginEl(); el.hidden=false;
   if(message){ var m=el.querySelector('#noon-login-msg'); m.textContent=message; m.className='sub'; }
   setTimeout(function(){ var i=el.querySelector('#nl-email')||el.querySelector('#nl-pass'); if(i) i.focus(); },50);
@@ -2496,6 +2512,12 @@ html[data-fs] .noon-modal:not(.xpage) .box{max-height:calc(94vh / var(--zf))!imp
   html[data-fs] .overlay:not(.sheet) .modal,html[data-fs] .overlay.td-modal .modal{min-height:calc(100vh / var(--zf))}
   html[data-fs] .noon-modal:not(.xpage) .box{max-height:calc(100vh / var(--zf))!important;height:calc(100vh / var(--zf))}
 }
+.th-fs-t{display:block;margin-top:6px;font:700 15px var(--display)}
+#th-set2 .h3{margin-top:22px;padding-top:14px;border-top:1px dashed var(--line)}
+#th-set2 textarea{font:inherit;line-height:1.7;resize:vertical}
+.th-days{display:flex;flex-wrap:wrap;gap:8px}.th-day{padding:6px 12px}
+.linkbtn{border:0;background:none;color:var(--accent);font:600 13px var(--font);cursor:pointer;text-decoration:underline;padding:0 4px}
+.linkbtn[disabled]{display:none}
 /* batch B: sheets panel + WhatsApp postponement list */
 .th-sheets{margin-bottom:18px}
 .sh-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:16px 18px 6px}
@@ -2768,7 +2790,7 @@ function parseAmt(v){
 }
 
 /* ---------- state ---------- */
-var DEFAULTS={centerName:'المركز التعليمي',currency:'د.ل',remindDays:5,countryCode:'218',courses:[]};
+var DEFAULTS={centerName:'المركز التعليمي',currency:'د.ل',remindDays:5,countryCode:'218',courses:[],address:'تاجوراء – جزيرة القمودي',phone:'0917703257',receiptNote:'شكراً لثقتكم بنا',waRemind:'',waAbsent:'',waPostpone:'',waReceipt:'السلام عليكم ورحمة الله وبركاته',heroMotto:'معاً نصنع جيلاً أكثر تميّزاً',sideMotto:'بالعلم.. نرتقي',packSoon:2,offDays:[5],backupDays:3,lockMin:15};
 var S={
   db:null, downloads:null, students:[], subs:[], payments:[], settings:mergeSettings({}),
   loaded:{students:false,subs:false,payments:false,settings:false,meta:false,backups:false,att:false},
@@ -2787,7 +2809,14 @@ function mergeSettings(d){
     currency:(d.currency||'').toString().trim()||DEFAULTS.currency,
     remindDays:(isFinite(rd)&&rd>=0)?Math.floor(rd):DEFAULTS.remindDays,
     countryCode:(d.countryCode==null?DEFAULTS.countryCode:String(d.countryCode)).replace(/\D/g,''),
-    courses:Array.isArray(d.courses)?d.courses.filter(function(c){return c&&c.name;}).map(function(c){return {name:String(c.name),fee:Number(c.fee)||0,sessionFee:Number(c.sessionFee)||0};}):[]
+    courses:Array.isArray(d.courses)?d.courses.filter(function(c){return c&&c.name;}).map(function(c){return {name:String(c.name),fee:Number(c.fee)||0,sessionFee:Number(c.sessionFee)||0};}):[],
+    address:d.address==null?DEFAULTS.address:String(d.address).slice(0,120), phone:d.phone==null?DEFAULTS.phone:String(d.phone).slice(0,40), receiptNote:d.receiptNote==null?DEFAULTS.receiptNote:String(d.receiptNote).slice(0,120),
+    waRemind:String(d.waRemind||'').slice(0,1500), waAbsent:String(d.waAbsent||'').slice(0,1500), waPostpone:String(d.waPostpone||'').slice(0,1500), waReceipt:d.waReceipt==null?DEFAULTS.waReceipt:String(d.waReceipt).slice(0,500),
+    heroMotto:d.heroMotto==null?DEFAULTS.heroMotto:String(d.heroMotto).slice(0,80), sideMotto:d.sideMotto==null?DEFAULTS.sideMotto:String(d.sideMotto).slice(0,40),
+    packSoon:(isFinite(Number(d.packSoon))&&d.packSoon!==''&&d.packSoon!=null&&Number(d.packSoon)>=0)?Math.floor(Number(d.packSoon)):DEFAULTS.packSoon,
+    offDays:Array.isArray(d.offDays)?d.offDays.map(Number).filter(function(x){ return x>=0&&x<=6; }):DEFAULTS.offDays.slice(),
+    backupDays:[1,3,7,14].indexOf(Number(d.backupDays))>=0?Number(d.backupDays):DEFAULTS.backupDays,
+    lockMin:[0,5,10,15,30,60].indexOf(Number(d.lockMin))>=0?Number(d.lockMin):DEFAULTS.lockMin
   };
 }
 function money(n){ return r3(n).toLocaleString('en-US',{maximumFractionDigits:3}); }
@@ -2890,6 +2919,7 @@ function alertMatches(r,f){
 
 /* ---------- reminder text ---------- */
 function reminderText(r){
+  if(window.thTplRemind&&S.settings.waRemind) return window.thTplRemind(r);
   var st=S.settings, s=r.status;
   var who=(r.st.guardian?'ولي أمر الطالب/ة ':'الطالب/ة ')+r.st.name;
   var course=s.course?(' في دورة «'+s.course+'»'):'';
@@ -2981,7 +3011,7 @@ function renderBanner(){
       if(!le) items.push({t:'لم تحفظ نسخة احتياطية على جهازك بعد. احفظ نسخة الآن حتى لا تضيع بياناتك.',go:true});
       else{
         var dd=diffDays(today,le);
-        if(dd>=7) items.push({t:'مضى '+dayWord(dd)+' على آخر نسخة احتياطية على جهازك.',go:true});
+        if(dd>=(S.settings.backupDays||3)) items.push({t:'مضى '+dayWord(dd)+' على آخر نسخة احتياطية على جهازك.',go:true});
       }
     }
   }
@@ -3145,6 +3175,7 @@ function fillSettings(){
   $('#st-remind').value=s.remindDays; $('#st-cc').value=s.countryCode;
   $('#st-courses').innerHTML=s.courses.map(courseRow).join('');
   $('#st-err').textContent=''; S.settingsDirty=false;
+  if(window.thFillSettings) window.thFillSettings(s);
 }
 function renderCourseList(){
   $('#courses-list').innerHTML=S.settings.courses.map(function(c){return '<option value="'+esc(c.name)+'"></option>';}).join('');
@@ -3510,6 +3541,7 @@ async function saveSettings(){
   var rd=parseInt(latinDigits($('#st-remind').value),10);
   if(!(rd>=0&&rd<=60)){ err.textContent='أيام التنبيه من 0 إلى 60.'; return; }
   var data={centerName:$('#st-center').value.trim(),currency:$('#st-currency').value.trim(),remindDays:rd,countryCode:latinDigits($('#st-cc').value).replace(/\D/g,''),courses:courses};
+  if(window.thSettingsExtra){ var ex=window.thSettingsExtra(); if(ex.err){ err.textContent=ex.err; return; } Object.assign(data,ex.data); }
   btn.disabled=true; err.textContent='';
   try{ await S.db.doc('settings/main').set(data); S.settingsDirty=false; toast('تم حفظ الإعدادات'); }
   catch(e){ err.textContent='تعذر الحفظ: '+(e&&e.message?e.message:'خطأ غير معروف'); }
@@ -3757,14 +3789,14 @@ function renderBackupState(){
   if(!le){ el.textContent=S.students.length?'لا توجد نسخة على جهازك بعد':''; el.className='state'+(S.students.length?' warn':''); return; }
   var days=diffDays(todayStr(),le);
   el.textContent='آخر نسخة على جهازك: '+fmtDate(le);
-  el.className='state'+(days>=7?' warn':'');
+  el.className='state'+(days>=(S.settings.backupDays||3)?' warn':'');
 }
 function renderBackup(){
   var st=$('#bk-status'); if(!st) return;
   if(!allLoaded()){ st.innerHTML='<div class="empty">جارٍ تحميل البيانات…</div>'; $('#bk-list').innerHTML=''; return; }
   var le=S.meta.lastExport, days=le?diffDays(todayStr(),le):null;
   st.innerHTML=
-    '<div class="bk-stat"><span class="stat-l">آخر نسخة محفوظة على جهازك</span><span class="stat-n '+(le&&days<7?'t-ok':'t-crit')+'">'+(le?fmtDate(le):'لم تُحفظ بعد')+'</span><span class="sub">'+(le?(days===0?'اليوم':'قبل '+dayWord(days)):'احفظ نسخة الآن')+'</span></div>'+
+    '<div class="bk-stat"><span class="stat-l">آخر نسخة محفوظة على جهازك</span><span class="stat-n '+(le&&days<(S.settings.backupDays||3)?'t-ok':'t-crit')+'">'+(le?fmtDate(le):'لم تُحفظ بعد')+'</span><span class="sub">'+(le?(days===0?'اليوم':'قبل '+dayWord(days)):'احفظ نسخة الآن')+'</span></div>'+
     '<div class="bk-stat"><span class="stat-l">السجلات الحالية</span><span class="stat-n">'+S.students.length+' <small>طالب</small></span><span class="sub">'+S.subs.length+' اشتراك · '+S.payments.length+' دفعة</span></div>'+
     '<div class="bk-stat"><span class="stat-l">النسخ التلقائية داخل النظام</span><span class="stat-n">'+S.backups.length+'</span><span class="sub">'+(S.backups.length?'آخرها '+snapLabel(S.backups.slice().sort(function(a,b){return a.id<b.id?1:-1;})[0].id):'لم تُنشأ بعد')+'</span></div>';
   var list=S.backups.slice().sort(function(a,b){return a.id<b.id?1:-1;});
@@ -3971,10 +4003,10 @@ function receiptModel(){
   var r=D.byId[S.rc.sid]; if(!r) return null;
   var s=r.subs.filter(function(x){ return x.id===S.rc.sub; })[0]; if(!s) return null;
   var pays=r.pays.filter(function(p){ return p.subId===s.id; }).slice().sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:((a.at||0)-(b.at||0))); });
-  return {no:receiptNo(s),center:S.settings.centerName,cur:S.settings.currency,name:r.st.name,course:s.course||'',session:s.kind==='session',start:s.start,end:s.end,months:s.months,fee:s.fee,paid:s.paid,remaining:s.remaining,pays:pays,today:todayStr(),pack:s.kind==='pack'?{total:(Number(s.sessionsTotal)||0)+(Number(s.sessionsAdjust)||0),left:s.left}:null,subjects:s.subjects||'',discount:Number(s.discount)||0,discountPct:s.discountPct||0,discountReason:s.discountReason||'',discountBy:s.discountBy||''};
+  return {no:receiptNo(s),center:S.settings.centerName,cur:S.settings.currency,name:r.st.name,course:s.course||'',session:s.kind==='session',start:s.start,end:s.end,months:s.months,fee:s.fee,paid:s.paid,remaining:s.remaining,pays:pays,today:todayStr(),addr:S.settings.address||'',phone:S.settings.phone||'',rnote:S.settings.receiptNote||'',pack:s.kind==='pack'?{total:(Number(s.sessionsTotal)||0)+(Number(s.sessionsAdjust)||0),left:s.left}:null,subjects:s.subjects||'',discount:Number(s.discount)||0,discountPct:s.discountPct||0,discountReason:s.discountReason||'',discountBy:s.discountBy||''};
 }
 function drawReceipt(m){
-  var W=RC.W, SC=RC.SC, rows=Math.max(m.pays.length,1), H=706+rows*58+440+(m.subjects?130:0), dy=m.subjects?130:0;
+  var W=RC.W, SC=RC.SC, rows=Math.max(m.pays.length,1), H=706+rows*58+440+(m.subjects?130:0)+((m.addr||m.phone||m.rnote)?80:0), dy=m.subjects?130:0;
   var cv=document.createElement('canvas'); cv.width=Math.round(W*SC); cv.height=Math.round(H*SC);
   var c=cv.getContext('2d'); c.scale(SC,SC); c.direction='rtl';
   c.fillStyle='#fff'; c.fillRect(0,0,W,H);
@@ -4034,6 +4066,8 @@ function drawReceipt(m){
   var sy=top+200+90; c.strokeStyle=INK; c.lineWidth=2; c.beginPath(); c.moveTo(M,sy); c.lineTo(M+380,sy); c.stroke();
   T('توقيع المستلم',M+190,sy+36,24,500,MU,'center');
   c.restore();
+  if(m.rnote) T(m.rnote,W/2,H-122,26,700,'#0F5F58','center');
+  if(m.addr||m.phone) T([m.addr,m.phone?'هاتف: '+m.phone:''].filter(Boolean).join('   ·   '),W/2,H-84,24,500,INK,'center');
   T('رقم الإيصال ثابت، وتتحدّث بياناته عند تسجيل أي دفعة جديدة.',W/2,H-44,22,500,MU,'center');
   return cv;
 }
@@ -4501,6 +4535,7 @@ function absentCalc(){
 function waPhone(r){ return toIntl(r.st.guardianPhone||r.st.phone); }
 function alertText(r){
   if((S.alertFilter==='absent'&&r.absent>=3)||alertKind(r)==='absent'){
+    if(window.thTplAbsent&&S.settings.waAbsent) return window.thTplAbsent(r);
     var st=S.settings, who=(r.st.guardian?'ولي أمر الطالب/ة ':'الطالب/ة ')+r.st.name;
     return ['السلام عليكم ورحمة الله وبركاته،','نفيدكم من إدارة '+st.centerName+' بأن '+(r.st.guardian?'الطالب/ة ':'')+r.st.name+' تغيّب عن الحضور '+r.absent+' مرات متتالية.',
       'نرجو الاطمئنان عليه وإخبارنا إن كان هناك ما يمنعه من الحضور.','شكراً لتعاونكم.'].join('\n');
@@ -4608,14 +4643,14 @@ async function sendReceiptWa(){
   // phones: the share sheet with the image attached (pick WhatsApp, then the contact)
   try{
     var f=blob&&new File([blob],'إيصال-'+m.no+'.png',{type:'image/png'});
-    if(f&&navigator.canShare&&navigator.share&&navigator.canShare({files:[f]})){ await navigator.share({files:[f],text:'السلام عليكم ورحمة الله وبركاته'}); return; }
+    if(f&&navigator.canShare&&navigator.share&&navigator.canShare({files:[f]})){ await navigator.share({files:[f],text:(S.settings.waReceipt||'')}); return; }
   }catch(e){ if(e&&e.name==='AbortError') return; }
   // computer: copy the image, open the guardian's chat, the user pastes it
   var p=waPhone(r), copied=false;
   try{ if(blob&&navigator.clipboard&&window.ClipboardItem){ await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); copied=true; } }catch(e){}
   if(!p){ toast(copied?'نُسخت صورة الإيصال. لا يوجد رقم هاتف للطالب، افتح المحادثة والصق الصورة':'لا يوجد رقم هاتف لهذا الطالب'); return; }
   toast(copied?'نُسخت صورة الإيصال، الصقها في المحادثة (Ctrl+V)':'تعذر نسخ الصورة، استخدم زر تنزيل PDF');
-  window.open('https://wa.me/'+p+'?text='+encodeURIComponent('السلام عليكم ورحمة الله وبركاته'),'_blank','noopener');
+  window.open('https://wa.me/'+p+'?text='+encodeURIComponent(S.settings.waReceipt||''),'_blank','noopener');
 }
 (function(){ var row=document.querySelector('#rcpt .row:last-of-type'); if(row&&!document.getElementById('rcpt-wa')){ var b=document.createElement('button'); b.type='button'; b.className='btn wa'; b.id='rcpt-wa'; b.dataset.xact='rcpt-wa'; b.textContent='مشاركة الصورة على واتساب'; row.insertBefore(b,row.firstChild); } })();
 document.addEventListener('click',function(e){
@@ -5248,13 +5283,14 @@ function thHero(){
     h=document.createElement('div'); h.id='th-hero'; h.className='th-hero';
     h.innerHTML='<div class="th-hero-img" aria-hidden="true"></div><div class="th-hero-wave" aria-hidden="true"></div>'+
       '<div class="th-hero-logo"><img alt="" data-logo></div>'+
-      '<div class="th-hero-txt"><span class="th-hi"></span><h2 class="th-cn"></h2><p>معاً نصنع جيلاً أكثر تميّزاً</p></div>';
+      '<div class="th-hero-txt"><span class="th-hi"></span><h2 class="th-cn"></h2><p></p></div>';
     d.insertBefore(h,d.firstChild);
     h.querySelector('img').src=window.NOON_LOGO||'';
   }
   var nm=String((window.CLOUD&&window.CLOUD.name)||'').trim().split(/\s+/)[0];
   h.querySelector('.th-hi').textContent='مرحباً'+(nm?' '+nm+'،':'')+' أهلاً بك في';
   h.querySelector('.th-cn').textContent=(S.settings&&S.settings.centerName)||'';
+  var hp=h.querySelector('p'); hp.textContent=(S.settings&&S.settings.heroMotto)||''; hp.hidden=!(S.settings&&S.settings.heroMotto);
 }
 var THST={active:['cal','gold'],soon:['clock','amber'],expired:['calx','red'],owing:['card','rose'],paid:['trend','green'],att:['users','teal']};
 function thStats(){
@@ -5333,6 +5369,7 @@ function thmApply(v){
   if(v==='auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme',v);
   var dark=v==='dark'||(v==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
   var m=document.querySelector('meta[name="theme-color"]'); if(m) m.setAttribute('content',dark?'#08110F':'#0D2E2D');
+  document.querySelectorAll('#th-fsbox [data-thm]').forEach(function(c){ c.setAttribute('aria-pressed',String(c.dataset.thm===v)); });
   var b=document.getElementById('th-theme'); if(b){ b.innerHTML='<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+THM.ic[v]+'</svg>'; b.title=THM.lab[v]+' (اضغط للتبديل)'; b.setAttribute('aria-label',b.title); }
 }
 (function(){
@@ -5349,11 +5386,11 @@ var THBK={shown:false,k:'noon-bk-snooze'};
 function thBackupNag(){
   if(navigator.webdriver) return;   // automated test browsers: the regression suite has its own test for this prompt
   if(THBK.shown||!allLoaded()||!(window.CLOUD&&window.CLOUD.role==='owner')||!S.students.length||!S.downloads) return;
-  var le=S.meta&&S.meta.lastExport, t=todayStr(), dd=le?diffDays(t,le):999; if(dd<7) return;
+  var le=S.meta&&S.meta.lastExport, t=todayStr(), dd=le?diffDays(t,le):999; if(dd<(S.settings.backupDays||3)) return;
   try{ if(localStorage.getItem(THBK.k)===t) return; }catch(e){}
   if(document.getElementById('x-modal')||(document.getElementById('overlay')&&!document.getElementById('overlay').hidden)) return;
   THBK.shown=true;
-  xModal('حان موعد النسخة الأسبوعية','<p>'+(le?'مضى '+esc(dayWord(dd))+' على آخر نسخة احتياطية حفظتها على هذا الجهاز ('+esc(fmtDate(le))+').':'لم تحفظ أي نسخة احتياطية على هذا الجهاز بعد.')+'</p>'+
+  xModal('حان موعد النسخة الاحتياطية','<p>'+(le?'مضى '+esc(dayWord(dd))+' على آخر نسخة احتياطية حفظتها على هذا الجهاز ('+esc(fmtDate(le))+').':'لم تحفظ أي نسخة احتياطية على هذا الجهاز بعد.')+'</p>'+
     '<p class="hint">النسخة ملف واحد فيه كل بيانات المركز. احفظه في مكان آمن (فلاشة أو بريدك الإلكتروني) حتى تستطيع استعادة كل شيء إن حدث أي طارئ.</p>'+
     '<div class="row"><button class="btn primary" type="button" data-xact="bk-now">تنزيل النسخة الآن</button><button class="btn" type="button" data-xact="bk-later">ذكّرني غداً</button></div>');
 }
@@ -5388,19 +5425,110 @@ function thfsApply(z){
   thfsApply(thfsGet());
   var sec=document.getElementById('tab-settings'); if(!sec||document.getElementById('th-fsbox')) return;
   var p=document.createElement('div'); p.id='th-fsbox'; p.className='panel th-fsbox';
-  p.innerHTML='<div class="panel-head"><h2>حجم الخط</h2></div><div class="th-fs-body"><p class="sub">يكبّر أو يصغّر كل خطوط المنظومة مع الحفاظ على التفاوت بينها. يُحفظ على هذا الجهاز فقط، فاختر لكل جهاز ما يريح العين عليه.</p>'+
+  p.innerHTML='<div class="panel-head"><h2>المظهر على هذا الجهاز</h2></div><div class="th-fs-body"><b class="th-fs-t">الوضع</b><div class="th-fs-opts" role="group" aria-label="الوضع">'+[['auto','تلقائي حسب الجهاز'],['light','فاتح'],['dark','ليلي']].map(function(o){ return '<button type="button" class="chip" data-thm="'+o[0]+'">'+o[1]+'</button>'; }).join('')+'</div><b class="th-fs-t">حجم الخط</b><p class="sub">يكبّر أو يصغّر كل خطوط المنظومة مع الحفاظ على التفاوت بينها. يُحفظ على هذا الجهاز فقط، فاختر لكل جهاز ما يريح العين عليه.</p>'+
     '<div class="th-fs-opts" role="group" aria-label="حجم الخط">'+THFS.opts.map(function(o){ return '<button type="button" class="chip" data-fs="'+o[0]+'" style="font-size:'+Math.round(15.5*o[0])+'px">'+o[1]+'</button>'; }).join('')+'</div>'+
     '<p class="th-fs-sample">مثال: <b>أحمد محمد</b> · حقيبة كاملة · المتبقي 300</p></div>';
   sec.insertBefore(p,sec.firstChild);
-  p.addEventListener('click',function(e){ var b=e.target.closest('[data-fs]'); if(!b) return; var z=parseFloat(b.dataset.fs); try{ localStorage.setItem(THFS.k,String(z)); }catch(x){} thfsApply(z); });
+  setTimeout(function(){ thmApply(thmGet()); },0);
+  p.addEventListener('click',function(e){ var t=e.target.closest('[data-thm]'); if(t){ try{ localStorage.setItem(THM.k,t.dataset.thm); }catch(x){} thmApply(t.dataset.thm); return; } var b=e.target.closest('[data-fs]'); if(!b) return; var z=parseFloat(b.dataset.fs); try{ localStorage.setItem(THFS.k,String(z)); }catch(x){} thfsApply(z); });
   thfsApply(thfsGet());
 })();
+
+/* ===================== settings v2 ===================== */
+function thFill(t,map){
+  return String(t||'').replace(/\{([^{}]+)\}/g,function(m,k){ k=k.trim(); return Object.prototype.hasOwnProperty.call(map,k)?map[k]:m; })
+    .split('\n').filter(function(line,i,arr){ return line.trim()!==''||(i>0&&arr[i-1].trim()!==''&&i<arr.length-1); }).join('\n').replace(/\n{3,}/g,'\n\n').trim();
+}
+var THTPL={
+  remind:'السلام عليكم ورحمة الله وبركاته،\nنفيدكم من إدارة {المركز} بأن اشتراك {الطالب} في دورة «{الدورة}» {الحالة}.\n{سطر_المتبقي}\nنرجو التكرم بالتواصل مع الإدارة.\nشكراً لتعاونكم.',
+  absent:'السلام عليكم ورحمة الله وبركاته،\nنفيدكم من إدارة {المركز} بأن الطالب/ة {الطالب} تغيّب عن الحضور {عدد_الغيابات} مرات متتالية.\nنرجو الاطمئنان عليه وإخبارنا إن كان هناك ما يمنعه من الحضور.\nشكراً لتعاونكم.',
+  postpone:'السلام عليكم ورحمة الله وبركاته،\nنود إعلامكم من {المركز} بأن حصة {المادة} ({الصف}) المقررة يوم {اليوم} {التاريخ} {الوقت} قد أُجّلت {الموعد_الجديد}.\nنعتذر عن أي إزعاج، وشكراً لتفهمكم.'
+};
+window.thTplRemind=function(r){
+  var st=S.settings, s=r.status;
+  var state=s.key==='soon'?(s.left===0?'ينتهي اليوم ('+fmtDate(s.end)+')':'ينتهي بتاريخ '+fmtDate(s.end)):s.key==='expired'?'انتهى بتاريخ '+fmtDate(s.end):(s.end?'ساري حتى '+fmtDate(s.end):'');
+  return thFill(st.waRemind,{'المركز':st.centerName,'الطالب':r.st.name,'ولي_الأمر':r.st.guardian||'','الدورة':s.course||'','الحالة':state,'تاريخ_الانتهاء':s.end?fmtDate(s.end):'',
+    'المتبقي':r.balance>0?mny(r.balance):'0','سطر_المتبقي':r.balance>0?'المبلغ المتبقي: '+mny(r.balance)+'.':''});
+};
+window.thTplAbsent=function(r){ var st=S.settings; return thFill(st.waAbsent,{'المركز':st.centerName,'الطالب':r.st.name,'ولي_الأمر':r.st.guardian||'','عدد_الغيابات':String(r.absent||0)}); };
+window.thTplPostpone=function(g,o){
+  var st=S.settings, day=o.day, sl=(g.slots||[]).filter(function(x){ return x.d===wdOf(day); })[0];
+  var nw=o.moved_to?'إلى يوم '+DAYN[wdOf(o.moved_to)]+' '+fmtDate(o.moved_to)+(o.moved_t?' الساعة '+o.moved_t:(sl?' الساعة '+sl.t:'')):'وسنبلغكم بالموعد الجديد قريباً';
+  return thFill(st.waPostpone,{'المركز':st.centerName,'المادة':g.subject,'الصف':GRADE_NAMES()[g.grade-1]||'','اليوم':DAYN[wdOf(day)],'التاريخ':fmtDate(day),'الوقت':sl?'الساعة '+sl.t:'','الموعد_الجديد':nw});
+};
+
+var THDAYS=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+function thOff(day){ var o=(S.settings&&S.settings.offDays)||[]; return o.indexOf(new Date(day+'T00:00:00Z').getUTCDay())>=0; }
+function thSetBox(){
+  var f=document.getElementById('f-settings'); if(!f||document.getElementById('th-set2')) return;
+  var row=f.querySelector('button[type=submit]'); row=row&&row.closest('.row')||row;
+  var d=document.createElement('div'); d.id='th-set2';
+  function ta(id,lab,hint){ return '<div class="field wide"><label for="'+id+'">'+lab+'</label><textarea id="'+id+'" rows="5"></textarea><div class="hint">'+hint+' <button type="button" class="linkbtn" data-tpl-reset="'+id+'">استعادة النص الافتراضي</button></div></div>'; }
+  d.innerHTML=
+    '<h3 class="h3">بيانات الإيصال</h3><div class="fgrid">'+
+      '<div class="field wide"><label for="st-addr">عنوان المركز</label><input id="st-addr" maxlength="120"></div>'+
+      '<div class="field"><label for="st-phone">رقم هاتف المركز</label><input id="st-phone" maxlength="40" dir="ltr"></div>'+
+      '<div class="field"><label for="st-rnote">عبارة أسفل الإيصال</label><input id="st-rnote" maxlength="120"></div></div>'+
+    '<h3 class="h3">رسائل واتساب</h3><p class="hint" style="margin-top:0">الكلمات بين { } تُستبدل تلقائياً عند الإرسال. اترك النص كما هو لاستخدام الصياغة الافتراضية.</p><div class="fgrid">'+
+      ta('st-wa-remind','تذكير الاشتراك','المتاح: {المركز} {الطالب} {ولي_الأمر} {الدورة} {الحالة} {تاريخ_الانتهاء} {المتبقي} {سطر_المتبقي}')+
+      ta('st-wa-absent','تنبيه الغياب المتكرر','المتاح: {المركز} {الطالب} {ولي_الأمر} {عدد_الغيابات}')+
+      ta('st-wa-pp','تأجيل الحصة','المتاح: {المركز} {المادة} {الصف} {اليوم} {التاريخ} {الوقت} {الموعد_الجديد}')+
+      '<div class="field wide"><label for="st-wa-rc">النص المرافق لصورة الإيصال</label><input id="st-wa-rc" maxlength="500"><div class="hint">اتركه فارغاً لإرسال الصورة وحدها.</div></div></div>'+
+    '<h3 class="h3">عبارات الواجهة</h3><div class="fgrid">'+
+      '<div class="field wide"><label for="st-hero">عبارة شريط الترحيب</label><input id="st-hero" maxlength="80"></div>'+
+      '<div class="field"><label for="st-side">عبارة أسفل القائمة</label><input id="st-side" maxlength="40"></div></div>'+
+    '<h3 class="h3">الحضور والباقات</h3><div class="fgrid">'+
+      '<div class="field"><label for="st-pack">«رصيد قليل» عندما يتبقى في الباقة</label><select id="st-pack">'+[0,1,2,3,4].map(function(n){ return '<option value="'+n+'">'+(n===0?'لا تنبيه':n===1?'حصة واحدة أو أقل':n===2?'حصتان أو أقل':n+' حصص أو أقل')+'</option>'; }).join('')+'</select></div>'+
+      '<div class="field wide"><label>أيام العطلة الأسبوعية</label><div class="th-days">'+THDAYS.map(function(n,i){ return '<label class="chk th-day"><input type="checkbox" value="'+i+'" data-offday><span>'+n+'</span></label>'; }).join('')+'</div><div class="hint">يوم العطلة لا يُطلب فيه تسجيل الحضور العام ولا يُعتبر فيه أحد غائباً. إن أعطيتم حصة فيه (مثل أيام الامتحانات) سجّلوا الحضور عادياً وسيُحتسب.</div></div></div>'+
+    '<h3 class="h3">النسخ الاحتياطي والأمان</h3><div class="fgrid">'+
+      '<div class="field"><label for="st-bk">تذكير النسخة الاحتياطية كل</label><select id="st-bk"><option value="1">يوم</option><option value="3">3 أيام</option><option value="7">أسبوع</option><option value="14">أسبوعين</option></select></div>'+
+      '<div class="field"><label for="st-lock">القفل التلقائي بعد عدم الاستخدام</label><select id="st-lock"><option value="0">معطّل</option><option value="5">5 دقائق</option><option value="10">10 دقائق</option><option value="15">15 دقيقة</option><option value="30">30 دقيقة</option><option value="60">ساعة</option></select></div></div>';
+  if(row) f.insertBefore(d,row); else f.appendChild(d);
+  d.addEventListener('click',function(e){ var b=e.target.closest('[data-tpl-reset]'); if(!b) return; var id=b.dataset.tplReset, k=id==='st-wa-remind'?'remind':id==='st-wa-absent'?'absent':'postpone'; document.getElementById(id).value=THTPL[k]; S.settingsDirty=true; });
+}
+window.thFillSettings=function(s){
+  thSetBox(); var g=function(i){ return document.getElementById(i); }; if(!g('st-addr')) return;
+  g('st-addr').value=s.address||''; g('st-phone').value=s.phone||''; g('st-rnote').value=s.receiptNote||'';
+  g('st-wa-remind').value=s.waRemind||THTPL.remind; g('st-wa-absent').value=s.waAbsent||THTPL.absent; g('st-wa-pp').value=s.waPostpone||THTPL.postpone; g('st-wa-rc').value=s.waReceipt||'';
+  g('st-hero').value=s.heroMotto||''; g('st-side').value=s.sideMotto||''; g('st-pack').value=String(s.packSoon); g('st-bk').value=String(s.backupDays); g('st-lock').value=String(s.lockMin);
+  document.querySelectorAll('#th-set2 [data-offday]').forEach(function(c){ c.checked=(s.offDays||[]).indexOf(+c.value)>=0; });
+  var own=!!(window.CLOUD&&window.CLOUD.role==='owner'); document.querySelectorAll('#th-set2 input,#th-set2 textarea,#th-set2 select,#th-set2 [data-tpl-reset]').forEach(function(x){ x.disabled=!own; });
+};
+window.thSettingsExtra=function(){
+  var g=function(i){ return document.getElementById(i); }; if(!g('st-addr')) return {data:{}};
+  function tpl(id,def){ var v=g(id).value.trim(); return v===def.trim()?'':v; }
+  return {data:{address:g('st-addr').value.trim(),phone:g('st-phone').value.trim(),receiptNote:g('st-rnote').value.trim(),
+    waRemind:tpl('st-wa-remind',THTPL.remind),waAbsent:tpl('st-wa-absent',THTPL.absent),waPostpone:tpl('st-wa-pp',THTPL.postpone),waReceipt:g('st-wa-rc').value.trim(),
+    heroMotto:g('st-hero').value.trim(),sideMotto:g('st-side').value.trim(),packSoon:+g('st-pack').value,backupDays:+g('st-bk').value,lockMin:+g('st-lock').value,
+    offDays:Array.prototype.slice.call(document.querySelectorAll('#th-set2 [data-offday]:checked')).map(function(c){ return +c.value; })}};
+};
+(function(){
+  thSetBox();
+  // pack threshold follows the setting
+  var _cp=compute; compute=function(){ if(S.settings&&S.settings.packSoon!=null) PACK_SOON=S.settings.packSoon; return _cp.apply(this,arguments); };
+  // mottos follow the settings
+  var _rh3=renderHeader; renderHeader=function(){ _rh3.apply(this,arguments); try{
+    var sm=document.querySelector('.th-motto span'); if(sm){ sm.textContent=S.settings.sideMotto||''; sm.parentNode.hidden=!S.settings.sideMotto; }
+    var hp=document.querySelector('#th-hero p'); if(hp){ hp.textContent=S.settings.heroMotto||''; hp.hidden=!S.settings.heroMotto; }
+  }catch(e){} };
+  // weekly off days: the general attendance does not ask for them, and nobody is "absent" on them
+  var _ad=renderAttDay; renderAttDay=function(){ _ad.apply(this,arguments); try{
+    if(!thOff(S.attDate)) return; var sm=document.getElementById('att-sum'); if(!sm) return;
+    var b=sm.querySelector('[data-act="att-absent-rest"]'); if(b) b.remove();
+    if(!sm.querySelector('.th-offnote')) sm.insertAdjacentHTML('afterbegin','<span class="pill warn th-offnote">يوم عطلة ('+THDAYS[new Date(S.attDate+'T00:00:00Z').getUTCDay()]+'): سجّلوا الحضور فقط إن كانت هناك حصة</span>');
+  }catch(e){} };
+  var _as=attendanceStatHtml; attendanceStatHtml=function(){ var t=todayStr(); if(thOff(t)&&!D.rows.some(function(r){ return markOf(t,r.st.id); })) return '<button class="stat" type="button" data-act="go-att"><span class="stat-n">عطلة</span><span class="stat-l">اليوم '+THDAYS[new Date(t+'T00:00:00Z').getUTCDay()]+' — لا حضور مطلوب</span></button>'; return _as.apply(this,arguments); };
+  // the backup reminder follows the setting, and the yellow notice disappears right after a backup
+  var _db=downloadBackup; downloadBackup=async function(){ var r=await _db.apply(this,arguments); try{ renderBanner(); renderBackupState(); if(S.tab==='backup') renderBackup(); }catch(e){} return r; };
+})();
+window.__thDebug={pack:function(){ return PACK_SOON; },rc:function(){ return RC.model; }};
 
 
 /* ===================== batch B: WhatsApp for a postponed session, ready-to-print sheets ===================== */
 
 /* ---- 10) tell the group's students that a session was postponed ---- */
 function ppWaText(g,o){
+  if(window.thTplPostpone&&S.settings.waPostpone) return window.thTplPostpone(g,o);
   var st=S.settings||{}, day=o.day, subj=g.subject+' ('+(GRADE_NAMES()[g.grade-1]||'')+')';
   var sl=(g.slots||[]).filter(function(s){ return s.d===wdOf(day); })[0];
   var L=['السلام عليكم ورحمة الله وبركاته،',
