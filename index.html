@@ -1980,12 +1980,14 @@ html .brand-name{font-size:19px}
 
 /* ===== pages opened from the sidebar (same markup as the old pop-ups, laid out as a normal page) ===== */
 #tab-xpage[hidden]{display:none}
-.noon-modal.xpage{position:static;inset:auto;z-index:auto;background:none;padding:0;display:block;animation:nPage .28s ease-out both;-webkit-backdrop-filter:none;backdrop-filter:none}
+.noon-modal.xpage{position:static;inset:auto;z-index:auto;background:none;padding:0;display:block;animation:none!important;-webkit-backdrop-filter:none;backdrop-filter:none}
 @keyframes nPage{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .noon-modal.xpage .box{width:100%!important;min-width:0!important;max-width:none!important;max-height:none;height:auto;border-radius:16px;border:1px solid var(--line);border-top:3px solid var(--gold);box-shadow:var(--shadow);animation:none;display:block;background:var(--surface)}
 .noon-modal.xpage .hd{display:none}
 .noon-modal.xpage .bd{padding:18px 20px;overflow:visible;max-height:none}
 @media (max-width:700px){.noon-modal.xpage .bd{padding:14px 12px}.noon-modal.xpage .box{border-radius:14px}}
+
+.noon-modal.xpage .box,.noon-modal.xpage *{animation:none!important}
 
 /* ===== refined theme: ivory + deep green + logo gold ===== */
 body{font-feature-settings:"lnum" 1,"tnum" 1;-webkit-font-smoothing:antialiased;letter-spacing:.005em}
