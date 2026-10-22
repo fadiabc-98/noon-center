@@ -1894,7 +1894,8 @@ input[type=file]{padding:.45em}
 .td-nav{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px}
 .td-date{font-size:17px}
 .td-g{border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:12px;background:var(--surface)}
-.td-g.off{opacity:.7}
+.td-g.off{border-color:var(--warn);border-inline-start:4px solid var(--warn);background:color-mix(in srgb,var(--warn-bg) 45%,var(--surface))}
+.td-g.off .td-h b,.td-g.off h3{color:var(--fg)}
 .td-h{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:6px}
 .td-r{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line)}
 .td-n{display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:150px}
@@ -1994,6 +1995,14 @@ html .brand-name{font-size:19px}
 @media (max-width:700px){.noon-modal.xpage .bd{padding:14px 12px}.noon-modal.xpage .box{border-radius:14px}}
 
 .noon-modal.xpage .box,.noon-modal.xpage *{animation:none!important}
+
+/* today's sessions: darker secondary text (was too faint) */
+:root{--muted-strong:#3E504B}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--muted-strong:#C6D6D2}}
+:root[data-theme="dark"]{--muted-strong:#C6D6D2}
+#td-page .sub,#td-page .hint,#td-page small,#td-page .td-pp label{color:var(--muted-strong);font-size:13.5px}
+#td-page .sub b{color:var(--fg)}
+#td-page .td-g{color:var(--fg)}
 
 /* ===== refined theme: ivory + deep green + logo gold ===== */
 body{font-feature-settings:"lnum" 1,"tnum" 1;-webkit-font-smoothing:antialiased;letter-spacing:.005em}
@@ -4428,7 +4437,7 @@ function todayHtml(){
       (isOff?'':'<button class="btn sm" type="button" data-xact="td-off" data-g="'+esc(g.id)+'">تأجيل الحصة</button>')+'</div>';
     if(isOff){
       var o=it.off;
-      return '<div class="td-g off">'+hd+'<div class="sub">الحصة مؤجلة في هذا اليوم ولا تُحتسب على أحد'+(o.moved_to?'، وأُجّلت إلى <b dir="ltr">'+esc(fmtDate(o.moved_to))+'</b>'+(o.moved_t?' الساعة '+esc(o.moved_t):''):' (بدون موعد محدد)')+'.</div>'+
+      return '<div class="td-g off">'+hd+'<div class="sub"><span class="pill warn">مؤجّلة</span> الحصة مؤجلة في هذا اليوم ولا تُحتسب على أحد'+(o.moved_to?'، وأُجّلت إلى <b dir="ltr">'+esc(fmtDate(o.moved_to))+'</b>'+(o.moved_t?' الساعة '+esc(o.moved_t):''):' (بدون موعد محدد)')+'.</div>'+
         (TD.pp&&TD.pp.g===g.id?ppFormHtml(it):'<div class="row"><button class="btn sm primary" type="button" data-xact="td-off" data-g="'+esc(g.id)+'">'+(o.moved_to?'تغيير الموعد':'تحديد موعد التعويض')+'</button><button class="btn sm" type="button" data-xact="td-unoff" data-g="'+esc(g.id)+'">إلغاء التأجيل</button></div>')+'</div>';
     }
     // teacher attendance
