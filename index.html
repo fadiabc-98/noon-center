@@ -2481,6 +2481,21 @@ html .brand-name{font-size:21px}
   html .th-hero h2{font-size:21px}
   html .bnav button{font-size:12.5px}
 }
+/* text size option (settings): the page is zoomed as a whole, so viewport-height boxes are divided back by the zoom factor */
+.th-fsbox{max-width:760px;margin-bottom:18px}
+.th-fs-body{padding:14px 20px 18px}
+.th-fs-opts{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+.th-fs-sample{margin:6px 0 0;color:var(--muted-strong,var(--muted))}.th-fs-sample b{color:var(--fg)}
+@media (min-width:701px){html[data-fs] .shell{min-height:calc(100vh / var(--zf))}html[data-fs] .side{height:calc(100vh / var(--zf))}}
+html[data-fs] .gridwrap{max-height:calc(72vh / var(--zf))}
+html[data-fs] #gs-res{max-height:calc(60vh / var(--zf))}
+html[data-fs] .gs-list{max-height:calc(55vh / var(--zf))}
+html[data-fs] .bulk-list{max-height:calc(58vh / var(--zf))}
+html[data-fs] .noon-modal:not(.xpage) .box{max-height:calc(94vh / var(--zf))!important}
+@media (max-width:700px){
+  html[data-fs] .overlay:not(.sheet) .modal,html[data-fs] .overlay.td-modal .modal{min-height:calc(100vh / var(--zf))}
+  html[data-fs] .noon-modal:not(.xpage) .box{max-height:calc(100vh / var(--zf))!important;height:calc(100vh / var(--zf))}
+}
 /* batch B: sheets panel + WhatsApp postponement list */
 .th-sheets{margin-bottom:18px}
 .sh-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:16px 18px 6px}
@@ -5360,6 +5375,26 @@ function thPaidCard(){
 }
 (function(){ var _rd2=renderDash; renderDash=function(){ _rd2.apply(this,arguments); try{ thPaidCard(); }catch(e){ if(window.console) console.error(e); } }; })();
 
+
+/* ===== text size (settings page): per device, keeps the proportions between all fonts ===== */
+var THFS={k:'noon-fs',opts:[[0.92,'أصغر'],[1,'عادي'],[1.1,'كبير'],[1.2,'أكبر']]};
+function thfsGet(){ try{ var v=parseFloat(localStorage.getItem(THFS.k)); if(THFS.opts.some(function(o){ return o[0]===v; })) return v; }catch(e){} return 1; }
+function thfsApply(z){
+  var r=document.documentElement; r.style.zoom=z===1?'':String(z); r.style.setProperty('--zf',String(z));
+  if(z===1) r.removeAttribute('data-fs'); else r.setAttribute('data-fs',String(z));
+  document.querySelectorAll('#th-fsbox [data-fs]').forEach(function(b){ b.setAttribute('aria-pressed',String(parseFloat(b.dataset.fs)===z)); });
+}
+(function(){
+  thfsApply(thfsGet());
+  var sec=document.getElementById('tab-settings'); if(!sec||document.getElementById('th-fsbox')) return;
+  var p=document.createElement('div'); p.id='th-fsbox'; p.className='panel th-fsbox';
+  p.innerHTML='<div class="panel-head"><h2>حجم الخط</h2></div><div class="th-fs-body"><p class="sub">يكبّر أو يصغّر كل خطوط المنظومة مع الحفاظ على التفاوت بينها. يُحفظ على هذا الجهاز فقط، فاختر لكل جهاز ما يريح العين عليه.</p>'+
+    '<div class="th-fs-opts" role="group" aria-label="حجم الخط">'+THFS.opts.map(function(o){ return '<button type="button" class="chip" data-fs="'+o[0]+'" style="font-size:'+Math.round(15.5*o[0])+'px">'+o[1]+'</button>'; }).join('')+'</div>'+
+    '<p class="th-fs-sample">مثال: <b>أحمد محمد</b> · حقيبة كاملة · المتبقي 300</p></div>';
+  sec.insertBefore(p,sec.firstChild);
+  p.addEventListener('click',function(e){ var b=e.target.closest('[data-fs]'); if(!b) return; var z=parseFloat(b.dataset.fs); try{ localStorage.setItem(THFS.k,String(z)); }catch(x){} thfsApply(z); });
+  thfsApply(thfsGet());
+})();
 
 
 /* ===================== batch B: WhatsApp for a postponed session, ready-to-print sheets ===================== */
