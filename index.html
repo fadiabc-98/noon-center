@@ -2444,6 +2444,43 @@ html #noon-login input{height:46px;border-radius:12px}
 /* the second (old) search box on the students page is replaced by the top search */
 html #tab-students .toolbar #q{display:none}
 .th-theme svg{transition:transform .3s ease}.th-theme:hover svg{transform:rotate(20deg)}
+@media (max-width:700px){
+  html .top-actions{flex-wrap:wrap;gap:8px}
+  html .top-actions>.btn{flex:1 1 calc(50% - 8px);order:1;white-space:nowrap}
+  html .top-actions>.th-bell,html .top-actions>.th-user{order:2;flex:none}
+  html .top-actions>.th-user{margin-inline-start:auto}
+  html .top-actions>.gsearch{order:3}
+}
+
+/* ===== larger type everywhere (all devices), same proportions; student names stand out ===== */
+html body{font-size:16.5px}
+html .topbar h1{font-size:28px}
+html .panel-head h2,html .m-head h2,html .noon-modal .hd,html .h3,html .gate-card h2,html .td-g h3,html .th-sheets .panel-head h2{font-size:20.5px}
+html .noon-modal h3.sec{font-size:19.5px}
+html .tbl th,html .imp th,html .agrid th{font-size:15.5px}
+html .tbl td,html .imp td,html .noon-modal td{font-size:15.5px}
+html .linklike,html #td-page .td-n .linklike,html .att-row .linklike,html .agrid .nm .linklike{font-size:17px;font-weight:800}
+html #recent .rrow b,html .bulk-row b,html .gs-item b{font-size:16.5px}
+html .tbl td.n,html .tbl .num,html .num,html .imp td.n,html .noon-modal td.n{font-size:16.5px}
+html .sub,html .hint,html small,html .tbl td .sub,html #td-page .sub{font-size:13.5px}
+html .btn,html .tab-btn,html .bnav button,html .m-back,html .noon-modal button,html .chip{font-size:15.5px}
+html .btn.sm{font-size:14.5px}
+html .stat .stat-n{font-size:28px!important}
+html .stat .stat-l{font-size:15.5px}
+html .noon-modal .bd{font-size:15.5px}
+html .field label{font-size:14.5px}
+html input,html select,html textarea{font-size:16px}
+html .pill{font-size:13.5px}
+html .th-who b{font-size:15px}html .th-who small{font-size:12.5px}
+html .th-hero h2{font-size:30px}html .th-hi,html .th-hero p{font-size:16px}
+html .brand-name{font-size:21px}
+@media (max-width:700px){
+  html .topbar h1{font-size:25px}
+  html .stat .stat-n{font-size:23px!important}
+  html .stat .stat-l{font-size:14.5px}
+  html .th-hero h2{font-size:21px}
+  html .bnav button{font-size:12.5px}
+}
 /* batch B: sheets panel + WhatsApp postponement list */
 .th-sheets{margin-bottom:18px}
 .sh-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:16px 18px 6px}
@@ -5262,9 +5299,11 @@ function thSide(){
 /* ===== one search box: on the students page the top search filters the list (the old second box is hidden) ===== */
 (function(){
   var q=document.getElementById('gs-q'), box=document.getElementById('gs-res'); if(!q) return;
-  function ph(){ q.placeholder=S.tab==='students'?'ابحث بالاسم أو رقم الهاتف…':'ابحث عن طالب… ( / )'; }
-  q.addEventListener('input',function(){ if(S.tab!=='students') return; S.q=q.value; renderStudents(); if(box) box.hidden=true; });
-  q.addEventListener('focus',function(){ if(S.tab==='students'&&box) setTimeout(function(){ box.hidden=true; },0); });
+  function onStu(){ var t=document.getElementById('tab-students'); return S.tab==='students'&&t&&!t.hidden; }
+  function ph(){ q.placeholder=onStu()?'ابحث بالاسم أو رقم الهاتف…':'ابحث عن طالب… ( / )'; }
+  q.addEventListener('input',function(){ if(!onStu()) return; S.q=q.value; renderStudents(); if(box) box.hidden=true; });
+  q.addEventListener('focus',function(){ ph(); if(onStu()&&box) setTimeout(function(){ box.hidden=true; },0); });
+  if(window.MutationObserver){ var ts=document.getElementById('tab-students'); if(ts) new MutationObserver(function(){ ph(); if(ts.hidden&&q.value){ q.value=''; if(box) box.hidden=true; } if(ts.hidden&&S.q){ S.q=''; } }).observe(ts,{attributes:true,attributeFilter:['hidden']}); }
   var _st=setTab; setTab=function(t){ if(S.q){ S.q=''; var old=document.getElementById('q'); if(old) old.value=''; } if(q.value){ q.value=''; if(box) box.hidden=true; } var r=_st.apply(this,arguments); ph(); return r; };
   ph();
 })();
@@ -5320,6 +5359,7 @@ function thPaidCard(){
   x.innerHTML='اليوم: <b>'+esc(money(r3(td)))+'</b>'+(pct==null?'':' · <span class="th-pct '+(pct>=0?'up':'down')+'">'+(pct>=0?'▲ ':'▼ ')+Math.abs(pct)+'%</span> <span class="sub">عن نفس الفترة من الشهر الماضي</span>');
 }
 (function(){ var _rd2=renderDash; renderDash=function(){ _rd2.apply(this,arguments); try{ thPaidCard(); }catch(e){ if(window.console) console.error(e); } }; })();
+
 
 
 /* ===================== batch B: WhatsApp for a postponed session, ready-to-print sheets ===================== */
