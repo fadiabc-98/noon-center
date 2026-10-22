@@ -708,7 +708,7 @@ function openLog(){
    '<label>المستخدم<input type="text" id="lg-user" placeholder="اسم"></label><label>بحث<input type="text" id="lg-q" placeholder="في الوصف"></label>'+
    '<button type="button" class="btn sm primary" id="lg-go">عرض</button><button type="button" class="btn sm" id="lg-verify">فحص سلامة السجل</button><button type="button" class="btn sm" id="lg-csv">تصدير CSV</button></div>'+
    '<div id="lg-msg" class="sub"></div><div id="lg-list"></div><div class="row"><button type="button" class="btn sm" id="lg-more" hidden>عرض المزيد</button></div></div></div>';
-  document.body.appendChild(ov); fmtInputs(ov);
+  mountPage(ov,'سجل التحركات','noon-nav-log'); fmtInputs(ov);
   var $=function(s){return ov.querySelector(s);}, offset=0, rows=[], PAGE=100;
   ov.querySelector('.x').onclick=function(){ ov.remove(); };
   function query(){
@@ -785,10 +785,22 @@ function fmtInputs(root){
   });
 }
 function okDate(v){ return /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(v||'')&&!isNaN(Date.parse(v+'T00:00:00Z')); }
-function modalShell(title,wide){
+function mountPage(ov,title,navId){   // show a screen as a page inside the main area (like the built-in tabs) instead of a pop-up
+  var dash=document.getElementById('tab-dash'), host=document.getElementById('tab-xpage');
+  if(!host){ host=document.createElement('section'); host.id='tab-xpage'; dash.parentNode.appendChild(host); }
+  ['dash','students','attendance','reports','backup','settings'].forEach(function(k){ var e=document.getElementById('tab-'+k); if(e) e.hidden=true; });
+  host.hidden=false; host.innerHTML=''; ov.classList.add('xpage'); host.appendChild(ov);
+  ov.remove=function(){ var d=document.querySelector('.tab-btn[data-tab="dash"]'); if(d) d.click(); };
+  document.querySelectorAll('.tab-btn').forEach(function(b){ if(b.id===navId) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
+  var pt=document.getElementById('pageTitle'); if(pt) pt.textContent=title;
+  window.scrollTo(0,0);
+}
+window.NOON_PAGE=function(title,navId){ var ov=document.createElement('div'); ov.className='noon-modal'; ov.innerHTML='<div class="box"><div class="bd"></div></div>'; mountPage(ov,title,navId); return {ov:ov,bd:ov.querySelector('.bd')}; };
+function modalShell(title,wide,navId){
   var ov=document.createElement('div'); ov.className='noon-modal'+(wide?' wide':'');
   ov.innerHTML='<div class="box" role="dialog" aria-modal="true"><div class="hd"><b>'+esc(title)+'</b><button type="button" class="x" aria-label="إغلاق">×</button></div><div class="bd"></div></div>';
-  document.body.appendChild(ov); ov.querySelector('.x').onclick=function(){ ov.remove(); }; fmtInputs(ov);
+  if(navId) mountPage(ov,title,navId); else document.body.appendChild(ov);
+  ov.querySelector('.x').onclick=function(){ ov.remove(); }; fmtInputs(ov);
   return {ov:ov,bd:ov.querySelector('.bd')};
 }
 function ownerOnly(){ if(window.CLOUD.role==='staff'){ banner('هذا القسم للمالك فقط.','crit'); return false; } return true; }
@@ -805,7 +817,7 @@ async function w(method,path,body,opt){ return http(method,path,Object.assign({b
 /* ===== accounts ===== */
 function openAccounts(){
   if(!ownerOnly()) return;
-  var sh=modalShell('إدارة الحسابات',true), bd=sh.bd, msgEl;
+  var sh=modalShell('إدارة الحسابات',true,'noon-nav-accounts'), bd=sh.bd, msgEl;
   function say(t,cls){ msgEl.className='sub '+(cls||''); msgEl.textContent=t||''; }
   async function render(){
     var rows; try{ rows=await rpc('accounts_list',{}); }catch(e){ bd.innerHTML='<div class="bad">'+esc(adminErr(e))+'</div>'; return; }
@@ -890,7 +902,7 @@ window.NOON_CLASHGATE=clashGate;
 window.NOON_SESSIONS_ON=sessionsOn;
 function openTimetable(){
   var owner=window.CLOUD.role==='owner';
-  var sh=modalShell('الجدول والأسعار',true), bd=sh.bd, tab='week', gf='', msg='', msgCls='', editing=null, c=cur();
+  var sh=modalShell('الجدول والأسعار',true,'noon-nav-tt'), bd=sh.bd, tab='week', gf='', msg='', msgCls='', editing=null, c=cur();
   var G=window.NOON_GRADES, DAYS=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'], ORDER=[6,0,1,2,3,4,5];
   function endOf(t,m){ var x=(+t.slice(0,2))*60+(+t.slice(3,5))+Number(m); x=x%1440; return ('0'+Math.floor(x/60)).slice(-2)+':'+('0'+(x%60)).slice(-2); }
   function tname(id){ var t=(window.NOON_TEACHERS||[]).filter(function(x){return x.id===id;})[0]; return t?t.name:''; }
@@ -974,7 +986,7 @@ function openTimetable(){
 
 /* ===== inquiries (owner and receptionist) ===== */
 function openInquiries(){
-  var sh=modalShell('الاستفسارات',true), bd=sh.bd, filt='open', rows=[], msg='';
+  var sh=modalShell('الاستفسارات',true,'noon-nav-inq'), bd=sh.bd, filt='open', rows=[], msg='';
   var ST={'new':'جديد',contacted:'تم التواصل',enrolled:'سجّل',lost:'لم يسجّل'};
   async function load(){ try{ rows=await fetchAll('/rest/v1/inquiries?select=*&order=created_at.desc'); }catch(e){ bd.innerHTML='<div class="bad">'+esc(friendly(e).message)+'</div>'; return false; } return true; }
   function wa(p){ var ph=String(p||'').replace(/\D/g,''); if(!ph) return ''; var cc=(typeof S!=='undefined'&&S.settings&&S.settings.countryCode)||'218'; if(ph[0]==='0') ph=cc+ph.slice(1); return ph; }
@@ -1066,7 +1078,7 @@ function openWipe(){
 /* ===== expenses & payroll ===== */
 function openMoney(){
   if(!ownerOnly()) return;
-  var sh=modalShell('المصروفات والرواتب',true), bd=sh.bd;
+  var sh=modalShell('المصروفات والرواتب',true,'noon-nav-money'), bd=sh.bd;
   var D={employees:[],salaries:[],advances:[],pays:[],expenses:[],teachers:[],terms:[],tpays:[]}, tab='sum', month=today().slice(0,7), editExp=null, formId=null, msg='', msgCls='';
   bd.innerHTML='جارٍ التحميل…';
   async function load(){
@@ -1965,6 +1977,15 @@ html .brand-name{font-size:19px}
 
 .btn.wa{background:#1FA855;border-color:#1FA855;color:#fff;font-weight:700}.btn.wa:hover{background:#188a46}
 #rcpt .row{flex-wrap:wrap;gap:8px}
+
+/* ===== pages opened from the sidebar (same markup as the old pop-ups, laid out as a normal page) ===== */
+#tab-xpage[hidden]{display:none}
+.noon-modal.xpage{position:static;inset:auto;z-index:auto;background:none;padding:0;display:block;animation:nPage .28s ease-out both;-webkit-backdrop-filter:none;backdrop-filter:none}
+@keyframes nPage{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.noon-modal.xpage .box{width:100%!important;min-width:0!important;max-width:none!important;max-height:none;height:auto;border-radius:16px;border:1px solid var(--line);border-top:3px solid var(--gold);box-shadow:var(--shadow);animation:none;display:block;background:var(--surface)}
+.noon-modal.xpage .hd{display:none}
+.noon-modal.xpage .bd{padding:18px 20px;overflow:visible;max-height:none}
+@media (max-width:700px){.noon-modal.xpage .bd{padding:14px 12px}.noon-modal.xpage .box{border-radius:14px}}
 
 /* ===== refined theme: ivory + deep green + logo gold ===== */
 body{font-feature-settings:"lnum" 1,"tnum" 1;-webkit-font-smoothing:antialiased;letter-spacing:.005em}
@@ -3807,6 +3828,7 @@ function setTab(t){
   if(t==='backup'&&isStaff()) t='dash';
   S.tab=t;
   ['dash','students','attendance','reports','backup','settings'].forEach(function(k){ $('#tab-'+k).hidden=(k!==t); });
+  var xp=$('#tab-xpage'); if(xp){ xp.hidden=true; xp.innerHTML=''; }
   $$('.tab-btn').forEach(function(b){ if(b.dataset.tab===t) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
   $('#pageTitle').textContent=TITLES[t]||'';
   if(t==='settings'){ fillSettings(); fillSecurity(); }
@@ -4421,15 +4443,13 @@ function todayHtml(){
   }).join('');
 }
 function renderToday(){
-  var o=document.getElementById('x-modal'); if(!o||!TD.open) return;
-  var md=o.querySelector('.modal'), top=md?md.scrollTop:0, body=document.getElementById('x-body');
-  if(body) body.innerHTML=todayHtml();
-  if(md) md.scrollTop=top;
+  var body=document.getElementById('td-page'); if(!body||!TD.open) return;
+  body.innerHTML=todayHtml();
 }
 function openToday(day){
   if(!allLoaded()){ toast('جارٍ تحميل البيانات…'); return; }
   TD.day=day||TD.day||todayStr();
-  var o=xModal('حصص اليوم','<div></div>'); TD.open=true; o.classList.add('td-modal'); o.querySelector('.modal').style.width='min(760px,100%)'; renderToday();
+  var sh=window.NOON_PAGE('حصص اليوم','noon-nav-today'); sh.bd.id='td-page'; TD.open=true; renderToday();
 }
 window.NOON_TODAY=function(){ TD.day=todayStr(); openToday(); };
 window.NOON_REDRAW=function(){
@@ -4437,12 +4457,9 @@ window.NOON_REDRAW=function(){
     if(!allLoaded()) return;
     renderAll();
     var a=document.activeElement;
-    if(TD.open&&document.getElementById('x-modal')&&!(a&&a.tagName==='INPUT'&&a.closest('#x-modal'))) renderToday();
+    if(TD.open&&document.getElementById('td-page')&&!(a&&a.tagName==='INPUT'&&a.closest('#td-page'))) renderToday();
   }catch(e){ if(window.console) console.error(e); }
 };
-(function(){
-  var oc=closeX; closeX=function(){ TD.open=false; oc(); };
-})();
 document.addEventListener('input',function(e){
   var t=e.target; if(!t||!t.id||t.id.indexOf('td-q-')!==0) return;
   var gid=t.dataset.g, box=document.getElementById('td-res-'+gid); if(!box) return;
@@ -4689,7 +4706,7 @@ document.addEventListener('submit',function(e){
 
 /* ===== stage 5b: modals behave like pages: body scroll locked, "back" button + phone back button close the top one ===== */
 (function(){
-  var MODALS='#overlay:not([hidden]), #x-modal, .noon-modal', pushed=0, silent=0, queued=false;
+  var MODALS='#overlay:not([hidden]), #x-modal, .noon-modal:not(.xpage)', pushed=0, silent=0, queued=false;
   function openEls(){ return Array.prototype.slice.call(document.querySelectorAll(MODALS)); }
   function closeTop(el){
     if(!el) return;
