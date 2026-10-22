@@ -4556,14 +4556,14 @@ async function sendReceiptWa(){
   // phones: the share sheet with the image attached (pick WhatsApp, then the contact)
   try{
     var f=blob&&new File([blob],'إيصال-'+m.no+'.png',{type:'image/png'});
-    if(f&&navigator.canShare&&navigator.share&&navigator.canShare({files:[f]})){ await navigator.share({files:[f],text:text}); return; }
+    if(f&&navigator.canShare&&navigator.share&&navigator.canShare({files:[f]})){ await navigator.share({files:[f],text:'السلام عليكم ورحمة الله وبركاته'}); return; }
   }catch(e){ if(e&&e.name==='AbortError') return; }
   // computer: copy the image, open the guardian's chat, the user pastes it
   var p=waPhone(r), copied=false;
   try{ if(blob&&navigator.clipboard&&window.ClipboardItem){ await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); copied=true; } }catch(e){}
   if(!p){ toast(copied?'نُسخت صورة الإيصال. لا يوجد رقم هاتف للطالب، افتح المحادثة والصق الصورة':'لا يوجد رقم هاتف لهذا الطالب'); return; }
   toast(copied?'نُسخت صورة الإيصال، الصقها في المحادثة (Ctrl+V)':'تعذر نسخ الصورة، استخدم زر تنزيل PDF');
-  window.open('https://wa.me/'+p+'?text='+encodeURIComponent(text),'_blank','noopener');
+  window.open('https://wa.me/'+p+'?text='+encodeURIComponent('السلام عليكم ورحمة الله وبركاته'),'_blank','noopener');
 }
 (function(){ var row=document.querySelector('#rcpt .row:last-of-type'); if(row&&!document.getElementById('rcpt-wa')){ var b=document.createElement('button'); b.type='button'; b.className='btn wa'; b.id='rcpt-wa'; b.dataset.xact='rcpt-wa'; b.textContent='مشاركة الصورة على واتساب'; row.insertBefore(b,row.firstChild); } })();
 document.addEventListener('click',function(e){
