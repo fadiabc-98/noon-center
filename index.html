@@ -2004,6 +2004,56 @@ html .brand-name{font-size:19px}
 #td-page .sub b{color:var(--fg)}
 #td-page .td-g{color:var(--fg)}
 
+/* ===================== polish: one card language across all sections ===================== */
+:root{--accent-line:color-mix(in srgb,var(--accent) 70%,transparent);--card-tint:color-mix(in srgb,var(--accent-soft) 35%,var(--surface))}
+
+/* today's sessions: every group is a card with a green spine; postponed ones keep the amber spine */
+#td-page .td-g:not(.off){border-inline-start:4px solid var(--accent-line);background:linear-gradient(180deg,var(--card-tint),var(--surface) 70%);box-shadow:0 1px 2px rgba(13,46,45,.04),0 6px 18px rgba(13,46,45,.05)}
+#td-page .td-g{transition:box-shadow .2s ease,transform .2s ease}
+#td-page .td-g:hover{box-shadow:0 2px 4px rgba(13,46,45,.06),0 12px 28px rgba(13,46,45,.09)}
+#td-page .td-h b,#td-page .td-g h3{font-family:var(--display);font-size:17px}
+#td-page .td-r{border-top-color:color-mix(in srgb,var(--line) 70%,transparent)}
+#td-page .td-nav{padding:6px 4px 10px;border-bottom:1px dashed var(--line);margin-bottom:14px}
+#td-page .td-date{font-family:var(--display);font-size:19px}
+
+/* stat / summary cards (home, money, partners, teachers) */
+.noon-modal .card,.stat{position:relative;overflow:hidden;border-inline-start:4px solid var(--accent-line)!important;background:linear-gradient(180deg,var(--card-tint),var(--surface) 75%)!important;box-shadow:0 1px 2px rgba(13,46,45,.04),0 6px 16px rgba(13,46,45,.05);transition:box-shadow .2s ease,transform .2s ease}
+.noon-modal .card:hover,.stat:hover{box-shadow:0 2px 4px rgba(13,46,45,.06),0 12px 26px rgba(13,46,45,.09);transform:translateY(-1px)}
+.noon-modal .card:has(b.bad),.stat:has(.t-crit),.stat:has(.bad){border-inline-start-color:var(--crit)!important;background:linear-gradient(180deg,color-mix(in srgb,var(--crit-bg) 45%,var(--surface)),var(--surface) 75%)!important}
+.noon-modal .card:has(b.t-ok){border-inline-start-color:var(--ok)!important;background:linear-gradient(180deg,color-mix(in srgb,var(--ok-bg) 45%,var(--surface)),var(--surface) 75%)!important}
+.noon-modal .card.big{border-inline-start-color:var(--gold)!important;background:linear-gradient(180deg,color-mix(in srgb,var(--gold) 12%,var(--surface)),var(--surface) 80%)!important}
+.noon-modal .card .l{color:var(--muted-strong);font-weight:600}
+
+/* section headings: a short gold bar before the title */
+.noon-modal h3.sec,.panel-head h2,.overlay .h3{display:flex;align-items:center;gap:10px}
+.noon-modal h3.sec::before,.panel-head h2::before,.overlay .h3::before{content:"";width:5px;height:1.05em;border-radius:3px;background:linear-gradient(180deg,var(--gold2,var(--gold)),var(--gold));flex:none}
+
+/* tables inside sections: tinted header, soft rows, rounded frame */
+table.imp{border-collapse:separate;border-spacing:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface)}
+table.imp thead th{background:color-mix(in srgb,var(--accent-soft) 60%,var(--surface));color:var(--fg);font-weight:700;border-bottom:1px solid var(--line)}
+table.imp th,table.imp td{padding:9px 12px!important}
+table.imp tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--surface2) 70%,var(--surface))}
+table.imp tbody tr:hover td{background:color-mix(in srgb,var(--accent-soft) 45%,var(--surface))}
+table.imp tbody tr:last-child td{border-bottom:0}
+
+/* tabs inside sections: pill segmented look */
+.noon-modal .tabs{padding:6px;background:color-mix(in srgb,var(--surface2) 80%,var(--surface));border:1px solid var(--line);border-radius:14px;gap:6px}
+.noon-modal .tabs button{border-color:transparent!important;background:transparent!important;border-radius:10px!important;transition:background-color .18s ease,color .18s ease}
+.noon-modal .tabs button:hover{background:color-mix(in srgb,var(--accent-soft) 70%,transparent)!important}
+.noon-modal .tabs button.on{background:var(--side)!important;color:#fff!important;box-shadow:0 4px 12px rgba(13,46,45,.22)}
+
+/* inline forms (add teacher / draw / settings): a soft framed box */
+.sub-f{padding:14px 16px;border:1px dashed color-mix(in srgb,var(--accent) 45%,var(--line));border-radius:14px;background:color-mix(in srgb,var(--accent-soft) 30%,var(--surface));margin:8px 0 14px}
+
+/* student card lists (subscriptions, payments): each entry a small card */
+.overlay .item{padding:11px 14px;margin:8px 0;border:1px solid var(--line);border-inline-start:4px solid var(--accent-line);border-radius:12px;background:linear-gradient(180deg,var(--card-tint),var(--surface) 80%)}
+.overlay .item:has(.pill.crit),.overlay .item:has(.t-crit){border-inline-start-color:var(--crit)}
+.overlay .item:has(.pill.warn){border-inline-start-color:var(--warn)}
+.overlay .kvs{border-radius:14px;background:linear-gradient(180deg,var(--card-tint),var(--surface) 80%)}
+
+/* pills: a touch more weight */
+.pill{box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 18%,transparent)}
+
 /* ===== refined theme: ivory + deep green + logo gold ===== */
 body{font-feature-settings:"lnum" 1,"tnum" 1;-webkit-font-smoothing:antialiased;letter-spacing:.005em}
 h1,h2,h3,.h3{letter-spacing:0}
