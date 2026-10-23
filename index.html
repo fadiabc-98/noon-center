@@ -2525,6 +2525,9 @@ html[data-fs] .noon-modal:not(.xpage) .box{max-height:calc(94vh / var(--zf))!imp
 .th-roll{margin-top:18px}
 /* follow-up list: the WhatsApp button already sends the reminder, so the duplicate "تذكير" button is hidden (still reachable from the student card) */
 html #alerts .a-act [data-act="open-remind"]{display:none!important}
+.th-hol{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 12px;padding:10px 14px;border:1px dashed var(--line);border-radius:14px;background:var(--surface2)}
+.th-hol.on{border:1px solid color-mix(in srgb,var(--c-amber) 45%,var(--line));background:color-mix(in srgb,var(--warn-bg) 55%,var(--surface))}
+.th-hol .btn{margin-inline-start:auto}.th-hol-b{display:flex;gap:8px;margin-inline-start:auto;flex-wrap:wrap}.th-hol-b .btn{margin:0}
 /* batch B: sheets panel + WhatsApp postponement list */
 .th-sheets{margin-bottom:18px}
 .sh-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:16px 18px 6px}
@@ -3820,7 +3823,7 @@ var WD=['أ','ن','ث','ر','خ','ج','س'];
 function dowOf(iso){ return new Date(toUTC(iso)).getUTCDay(); }
 function markOf(date,sid){ var m=S.att[date]; var v=m?m[sid]:''; return (v==='p'||v==='a')?v:''; }
 function coveredOn(r,date){
-  return r.subs.some(function(s){ return s.kind==='session'?s.start===date:s.kind==='pack'?(s.start<=date&&((s.left||0)>0||(s.lastDay||'')>=date)):(s.start<=date&&date<=s.end); });
+  return r.subs.some(function(s){ return s.kind==='session'?s.start===date:s.kind==='pack'?false:(s.start<=date&&date<=s.end); });
 }
 function expectedRows(date){
   return D.rows.filter(function(r){ return coveredOn(r,date)||markOf(date,r.st.id); });
@@ -3888,6 +3891,7 @@ function renderAttDay(){
   $('#att-list').innerHTML=rows.map(function(r){
     var sid=r.st.id, m=markOf(d,sid), cov=coveredOn(r,d), st=statusOf(r.subs,d,S.settings.remindDays), pill;
     if(cov) pill=statusPill(st);
+    else if(r.subs.some(function(x){ return x.kind==='pack'&&x.start<=d&&(x.left||0)>0; })) pill='<span class="pill info">باقة: الحضور من «حصص اليوم»</span>';
     else pill='<span class="pill crit">'+(st.key==='expired'?'اشتراكه منتهٍ':st.key==='upcoming'?'لم يبدأ اشتراكه':'لا يوجد اشتراك ساري')+'</span>';
     var dis=future?' disabled':'';
     return '<div class="att-row"><div class="att-info"><button class="linklike" type="button" data-act="open" data-id="'+esc(sid)+'">'+esc(r.st.name)+'</button>'+
@@ -3904,7 +3908,7 @@ function monthRows(ym){
     var has=false, k;
     for(k=1;k<=31&&!has;k++){ if(markOf(ym+'-'+pad(k),r.st.id)) has=true; }
     if(has) return true;
-    return r.subs.some(function(s){ return s.kind==='session'?(s.start>=first&&s.start<=last):s.kind==='pack'?(s.start<=last&&((s.left||0)>0||(s.lastDay||s.start)>=first)):(s.start<=last&&s.end>=first); });
+    return r.subs.some(function(s){ return s.kind==='session'?(s.start>=first&&s.start<=last):s.kind==='pack'?false:(s.start<=last&&s.end>=first); });
   }).sort(function(x,y){ return x.st.name.localeCompare(y.st.name,'ar'); });
 }
 function renderAttMonth(){
@@ -5832,6 +5836,76 @@ function rollRender(){
   };
 }
 (function(){ var _fs=window.thFillSettings; window.thFillSettings=function(){ if(_fs) _fs.apply(this,arguments); try{ rollRender(); }catch(e){ if(window.console) console.error(e); } }; })();
+
+/* ---- day off for the whole center (from «حصص اليوم»): every session of the day is postponed at once ---- */
+var HOL='عطلة';
+function holItems(day){ return todaySessions(day).filter(function(it){ return !it.mk; }); }
+function holOffs(day){ return (window.NOON_OFF||[]).filter(function(o){ return o.day===day&&String(o.note||'').indexOf(HOL)===0; }); }
+function holHtml(){
+  var day=TD.day, items=holItems(day), hol=holOffs(day), open=items.filter(function(it){ return !it.off; });
+  var reason=hol.length?String(hol[0].note).replace(/^عطلة:?\s*/,''):'';
+  var h='';
+  if(hol.length) h+='<div class="th-hol on"><span class="pill warn">عطلة</span> <b>'+esc(reason||'عطلة')+'</b> — حصص هذا اليوم مؤجّلة ولا تُحتسب على أحد. <span class="th-hol-b"><button class="btn sm wa" type="button" data-xact="hol-wa">إبلاغ الطلاب (واتساب)</button><button class="btn sm" type="button" data-xact="hol-cancel">إلغاء العطلة</button></span></div>';
+  if(open.length) h+='<div class="th-hol"><span class="sub">'+open.length+' حصة في هذا اليوم.</span> <button class="btn sm" type="button" data-xact="hol-new">'+(hol.length?'إضافة باقي الحصص إلى العطلة':'عطلة لهذا اليوم')+'</button></div>';
+  return h;
+}
+function holStudents(day){
+  var ids={}, out=[];
+  holItems(day).forEach(function(it){ rosterFor(it.g,day).forEach(function(r){ if(!ids[r.st.id]){ ids[r.st.id]=1; out.push({r:r,g:grpName(it.g.id)}); } }); });
+  expectedRows(day).forEach(function(r){ if(!ids[r.st.id]&&r.st.status!=='withdrawn'){ ids[r.st.id]=1; out.push({r:r,g:'الحضور العام'}); } });
+  return out.sort(function(a,b){ return a.r.st.name.localeCompare(b.r.st.name,'ar'); });
+}
+function holText(day,reason){
+  return ['السلام عليكم ورحمة الله وبركاته،','نود إعلامكم من '+S.settings.centerName+' بأن يوم '+DAYN[wdOf(day)]+' '+fmtDate(day)+' عطلة'+(reason&&reason!=='عطلة'?' ('+reason+')':'')+'، ولن تُعقد الحصص في هذا اليوم.','سنبلغكم بموعد التعويض إن وُجد. شكراً لتفهمكم.'].join('\n');
+}
+function openHolWa(){
+  var day=TD.day, hol=holOffs(day), reason=hol.length?String(hol[0].note).replace(/^عطلة:?\s*/,''):'', list=holStudents(day), text=holText(day,reason);
+  var rows=list.map(function(x,i){ var r=x.r, ph=ppWaPhone(r);
+    return '<div class="bulk-row" id="hw-'+i+'"><div><b>'+esc(r.st.name)+'</b><div class="sub">'+esc(x.g)+' · '+(ph?'<span dir="ltr">'+esc(r.st.phone||r.st.guardianPhone)+'</span>':'<span class="bad">لا يوجد رقم</span>')+'</div></div>'+(ph?'<button class="btn sm wa" type="button" data-xact="hw-go" data-i="'+i+'">إرسال</button>':'')+'</div>'; }).join('');
+  var m=xModal('إبلاغ الطلاب بالعطلة','<p class="sub" style="margin-top:0">'+list.length+' طالب لديهم حصص أو حضور في هذا اليوم. اضغط «إرسال» أمام كل طالب (رقم الطالب، وإن لم يوجد فرقم ولي الأمر).</p><details class="ppw-msg"><summary>نص الرسالة</summary><pre>'+esc(text)+'</pre></details>'+(rows?'<div class="bulk-list">'+rows+'</div>':'<div class="empty">لا يوجد طلاب.</div>'));
+  m.__hw={list:list,text:text};
+}
+async function holSet(on,reason){
+  var day=TD.day, api=window.NOON_API, prev=window.NOON_OFF||[];
+  try{
+    if(on){
+      var rows=holItems(day).filter(function(it){ return !it.off; }).map(function(it){ return {group_id:it.g.id,day:day,note:'عطلة: '+(reason||'عطلة'),moved_to:null,moved_t:null}; });
+      if(!rows.length) return true;
+      window.NOON_OFF=prev.concat(rows); window.NOON_REDRAW();
+      await api.http('POST','/rest/v1/group_off?on_conflict=group_id,day',{body:rows,headers:{Prefer:'resolution=merge-duplicates,return=minimal'}});
+    }else{
+      window.NOON_OFF=prev.filter(function(o){ return !(o.day===day&&String(o.note||'').indexOf(HOL)===0); }); window.NOON_REDRAW();
+      await api.http('DELETE','/rest/v1/group_off?day=eq.'+day+'&note=like.'+encodeURIComponent(HOL+'*'),{headers:{Prefer:'return=minimal'}});
+    }
+  }catch(e){ window.NOON_OFF=prev; window.NOON_REDRAW(); toast('تعذر الحفظ: '+errMsg(e)); return false; }
+  api.reloadSessions(); return true;
+}
+document.addEventListener('click',async function(e){
+  var el=e.target.closest&&e.target.closest('[data-xact="hol-new"],[data-xact="hol-go"],[data-xact="hol-cancel"],[data-xact="hol-wa"],[data-xact="hw-go"]'); if(!el) return;
+  var a=el.dataset.xact, day=TD.day;
+  if(a==='hol-new'){
+    var n=holItems(day).filter(function(it){ return !it.off; }).length;
+    xModal('عطلة لهذا اليوم','<p>ستُؤجَّل <b>'+n+'</b> حصة يوم '+esc(DAYN[wdOf(day)]+' '+fmtDate(day))+' دفعة واحدة، ولن تُحتسب على أي طالب ولا على المعلمين. اشتراكات الحقيبة لا تتغير.</p>'+
+      '<div class="field"><label for="hol-r">سبب العطلة (اختياري)</label><input id="hol-r" maxlength="80" placeholder="مثال: ظرف طارئ"></div>'+
+      '<div class="row"><button class="btn primary" type="button" data-xact="hol-go">تأكيد العطلة</button><button class="btn" type="button" data-xact="close">إلغاء</button></div>');
+    return;
+  }
+  if(a==='hol-go'){ var r=(document.getElementById('hol-r').value||'').trim(); el.disabled=true; var ok=await holSet(true,r||'عطلة'); closeX(); if(ok){ toast('أُعلنت العطلة'); setTimeout(openHolWa,300); } return; }
+  if(a==='hol-cancel'){ if(!confirm('إلغاء العطلة وإرجاع حصص هذا اليوم؟')) return; if(await holSet(false)) toast('أُلغيت العطلة'); return; }
+  if(a==='hol-wa'){ openHolWa(); return; }
+  var m=document.getElementById('x-modal'), d=m&&m.__hw; if(!d) return;
+  var x=d.list[+el.dataset.i], ph=x&&ppWaPhone(x.r); if(!ph) return;
+  window.open('https://wa.me/'+ph+'?text='+encodeURIComponent(d.text),'_blank','noopener');
+  var row=document.getElementById('hw-'+el.dataset.i); if(row) row.classList.add('done'); el.textContent='أُرسلت ✓';
+});
+(function(){
+  var _rt2=renderToday; renderToday=function(){ _rt2.apply(this,arguments); try{
+    var nav=document.querySelector('#td-page .td-nav'); if(!nav) return; var old=document.getElementById('th-holbox'); if(old) old.remove();
+    var h=holHtml(); if(!h) return; var bx=document.createElement('div'); bx.id='th-holbox'; bx.innerHTML=h; nav.insertAdjacentElement('afterend',bx);
+  }catch(e){ if(window.console) console.error(e); } };
+  // the general attendance treats a declared day off like a weekly day off
+  var _off=thOff; thOff=function(day){ return _off.apply(this,arguments)||holOffs(day).length>0; };
+})();
 
 
 window.__app={buildBackup:buildBackup,downloadBackup:downloadBackup,buildPdf:buildPdf};
