@@ -3274,7 +3274,7 @@ function readSubFields(box,required){
   if(isNaN(paid)) return {error:'المبلغ المدفوع غير صحيح.'};
   if(paid>net) return {error:'المدفوع ('+money(paid)+') أكبر من الرسوم بعد الخصم ('+money(net)+').'};
   var pdEl=box.querySelector('[data-f="paydate"]'), payDate='';
-  if(pdEl&&paid>0){ payDate=parseDIn(pdEl.value.trim()); if(!isDate(payDate)) return {error:'تاريخ الدفعة غير صحيح. اكتبه بالشكل 05/11/2026.'}; }
+  if(pdEl&&paid>0){ payDate=parseDIn(pdEl.value.trim()); if(!isDate(payDate)) return {error:'تاريخ الدفعة غير صحيح. اكتبه بالشكل 05/11/2026.'}; if(payDate>todayStr()) return {error:'تاريخ الدفعة لا يمكن أن يكون في المستقبل.'}; }
   var tEl=box.querySelector('[data-f="teacher"]');
   return {payDate:payDate,sessions:pack?sn:0,groups:pack?gl:[],subjects:g('subjects'),kind:session?'session':(pack?'pack':'month'),course:course,start:start,months:months,end:end,fee:net,paid:paid,discount:disc,discountPct:dpct,discountReason:disc>0?dreason:'',method:g('method')==='transfer'?'transfer':'cash',teacherId:tEl&&tEl.value?tEl.value:''};
 }
@@ -3493,6 +3493,7 @@ async function submitPay(){
   var amt=parseAmt($('#pay-amt').value), date=parseDIn($('#pay-date').value);
   if(isNaN(amt)||amt<=0){ err.textContent='اكتب مبلغاً أكبر من صفر.'; return; }
   if(!isDate(date)){ err.textContent='تاريخ الدفعة غير صحيح. اكتبه بالشكل 05/11/2026.'; return; }
+  if(date>todayStr()){ err.textContent='تاريخ الدفعة لا يمكن أن يكون في المستقبل.'; return; }
   if(s.remaining<=0){ err.textContent='هذا الاشتراك مسدّد بالكامل.'; return; }
   if(amt>s.remaining){ err.textContent='المبلغ أكبر من المتبقي على هذا الاشتراك ('+money(s.remaining)+').'; return; }
   btn.disabled=true; err.textContent='';
@@ -5034,7 +5035,7 @@ document.addEventListener('change',function(e){
 /* ===== stage 5: payment date, owner edits of subscriptions / payments ===== */
 function isOwner(){ return !!(window.CLOUD&&window.CLOUD.role==='owner'); }
 function payDateFieldHtml(pre,o){
-  if(!isOwner()) return '';
+  if(!(window.CLOUD&&window.CLOUD.role)) return '';
   var st=o&&o.start||todayStr(), d=st<=todayStr()?st:todayStr();
   return '<div class="field"><label for="'+pre+'-paydate">تاريخ الدفعة</label><input id="'+pre+'-paydate" data-f="paydate" class="ltr dateinput" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off" value="'+esc(fmtDate(d))+'"></div>';
 }
@@ -5047,7 +5048,7 @@ document.addEventListener('input',function(e){
   }
 });
 async function confirmClosedDay(day){
-  if(!isOwner()||!day||day===todayStr()) return true;
+  if(!day||day===todayStr()) return true;
   var closed=false; try{ closed=await window.NOON_API.isClosed(day); }catch(x){}
   if(!closed) return true;
   return confirm('تنبيه: درج يوم '+fmtDate(day)+' مُقفل سابقاً. تسجيل دفعة أو تعديلها بهذا التاريخ يغيّر أرقام ذلك اليوم بعد إقفاله (يمكنك إعادة إقفاله لاحقاً). هل تريد المتابعة؟');
