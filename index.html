@@ -3593,7 +3593,7 @@ function buildBackup(){
   var s=S.settings;
   return {
     app:'student-system',version:1,createdAt:new Date().toISOString(),
-    settings:{centerName:s.centerName,currency:s.currency,remindDays:s.remindDays,countryCode:s.countryCode,courses:s.courses},
+    settings:Object.assign({},s),
     students:S.students,subs:S.subs,payments:S.payments,
     attendance:Object.keys(S.att).sort().map(function(d){ return {date:d,marks:S.att[d]}; })
   };
