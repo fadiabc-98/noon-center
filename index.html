@@ -2523,6 +2523,8 @@ html[data-fs] .noon-modal:not(.xpage) .box{max-height:calc(94vh / var(--zf))!imp
 .th-sib{margin:4px 0 6px;border-color:var(--gold)!important;color:var(--c-gold)!important;font-weight:700}
 .th-due{margin-top:4px}
 .th-roll{margin-top:18px}
+/* follow-up list: the WhatsApp button already sends the reminder, so the duplicate "تذكير" button is hidden (still reachable from the student card) */
+html #alerts .a-act [data-act="open-remind"]{display:none!important}
 /* batch B: sheets panel + WhatsApp postponement list */
 .th-sheets{margin-bottom:18px}
 .sh-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:16px 18px 6px}
