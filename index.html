@@ -2927,7 +2927,7 @@ function alertMatches(r,f){
 function reminderText(r){
   if(window.thTplRemind&&S.settings.waRemind) return window.thTplRemind(r);
   var st=S.settings, s=r.status;
-  var who=(r.st.guardian?'ولي أمر الطالب/ة ':'الطالب/ة ')+r.st.name;
+  var who='الطالب/ة '+r.st.name;
   var course=s.course?(' في دورة «'+s.course+'»'):'';
   var lines=['السلام عليكم ورحمة الله وبركاته،'];
   if(s.pack&&(s.key==='soon'||s.key==='expired')){
