@@ -826,7 +826,9 @@ function adminErr(e){
     password_short:'كلمة السر قصيرة: 12 حرفاً على الأقل.',password_in_use:'كلمة السر هذه مستعملة لحساب آخر. الدخول بكلمة السر فقط يتطلب أن تكون مختلفة لكل حساب.',
     parent_missing:'لا يمكن استرجاع هذا العنصر لأن الطالب المرتبط به محذوف. استرجع الطالب أولاً.',already_exists:'هذا السجل موجود بالفعل.',not_found:'العنصر غير موجود في السلة (ربما استُرجع).',future_day:'لا يمكن إقفال يوم بعيد في المستقبل.',bad_amount:'أدخل المبلغ الفعلي الموجود في الدرج.',last_owner:'لا يمكن إزالة آخر مالك أو تحويله إلى موظف.',cannot_remove_self:'لا يمكنك سحب صلاحية حسابك الحالي.',name_required:'الاسم مطلوب.',no_such_account:'الحساب غير موجود.'};
   for(var k in map){ if(m.indexOf(k)>=0) return map[k]; }
-  return friendly(e).message;
+  var fm=friendly(e).message;
+  if(/^تعذر تنفيذ العملية على الخادم/.test(fm)&&m) fm+=' [تفاصيل للمطوّر: '+m.slice(0,160)+']';
+  return fm;
 }
 async function w(method,path,body,opt){ return http(method,path,Object.assign({body:body,headers:{Prefer:'return=minimal'}},opt||{})); }
 
