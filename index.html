@@ -1100,7 +1100,7 @@ function openMoney(){
   var D={employees:[],salaries:[],advances:[],pays:[],expenses:[],teachers:[],terms:[],tpays:[]}, tab=STAFF?'exp':'sum', month=today().slice(0,7), editExp=null, formId=null, msg='', msgCls='';
   bd.innerHTML='جارٍ التحميل…';
   async function load(){
-    if(STAFF){ try{ D.expenses=await fetchAll('/rest/v1/expenses?select=*&order=on_date.desc,created_at.desc'); }catch(e){ bd.innerHTML='<div class="bad">'+esc(friendly(e).message)+'</div>'; return false; } return true; }
+    if(STAFF){ D.expenses=[]; return true; }   // the employee only records; the list stays with the owner
     try{
       var r=await Promise.all([fetchAll('/rest/v1/employees?select=*&order=created_at.asc'),fetchAll('/rest/v1/employee_salaries?select=*&order=from_date.asc'),
         fetchAll('/rest/v1/advances?select=*&order=on_date.asc,created_at.asc'),fetchAll('/rest/v1/salary_payments?select=*&order=period_start.asc'),fetchAll('/rest/v1/expenses?select=*&order=on_date.desc,created_at.desc'),
@@ -1125,7 +1125,7 @@ function openMoney(){
   }
   function render(){
     var head='<div class="tabs"><button type="button" data-t="sum"'+(tab==='sum'?' class="on"':'')+'>ملخص الشهر</button><button type="button" data-t="day"'+(tab==='day'?' class="on"':'')+'>الدخل اليومي</button><button type="button" data-t="exp"'+(tab==='exp'?' class="on"':'')+'>المصروفات</button><button type="button" data-t="emp"'+(tab==='emp'?' class="on"':'')+'>الموظفون والرواتب</button><button type="button" data-t="fin"'+(tab==='fin'?' class="on"':'')+'>اللوحة المالية</button><button type="button" data-t="cash"'+(tab==='cash'?' class="on"':'')+'>إقفال الصندوق</button><button type="button" data-t="tch"'+(tab==='tch'?' class="on"':'')+'>المعلمون</button><button type="button" data-t="par"'+(tab==='par'?' class="on"':'')+'>الشركاء</button><button type="button" data-t="year"'+(tab==='year'?' class="on"':'')+'>المقارنة السنوية</button></div><div id="mn-msg" class="sub '+msgCls+'">'+esc(msg)+'</div>';
-    if(STAFF) head='<p class="sub" style="margin:0 0 8px">سجّل هنا ما صُرف من الدرج. تظهر لك مصروفات هذا الشهر كلها حتى لا يتكرر التسجيل، وتستطيع تعديل أو حذف ما سجّلته أنت فقط.</p><div id="mn-msg" class="sub '+msgCls+'">'+esc(msg)+'</div>';
+    if(STAFF) head='<p class="sub" style="margin:0 0 8px">سجّل هنا ما يُسحب من الدرج. بعد الحفظ لا يمكن تعديل المصروف أو حذفه من هنا، فراجع المبلغ قبل الضغط على «إضافة مصروف». لتصحيح أي خطأ أبلغ المالك.</p><div id="mn-msg" class="sub '+msgCls+'">'+esc(msg)+'</div>';
     bd.innerHTML=head+'<div id="mn-body"></div>';
     bd.querySelectorAll('.tabs button').forEach(function(b){ b.onclick=function(){ tab=b.dataset.t; msg=''; render(); }; });
     var body=bd.querySelector('#mn-body');
@@ -1496,15 +1496,15 @@ function openMoney(){
     var r=monthRange(month), c=cur(), list=D.expenses.filter(function(x){ return inRange(x.on_date,r[0],r[1]); }), total=sum(list,function(x){return x.amount;});
     var e=editExp||{on_date:today(),amount:'',category:'',description:''}; if(!formId) formId=editExp?editExp.id:uuid();
     var cats=DEFAULT_CATS.slice(); D.expenses.forEach(function(x){ if(cats.indexOf(x.category)<0) cats.push(x.category); });
-    body.innerHTML=monthPicker()+
+    body.innerHTML=(STAFF?'':monthPicker())+
       '<form id="ex-f" class="filters frm"><label>التاريخ<input data-fmt="date" inputmode="numeric" maxlength="10" placeholder="YYYY-MM-DD" autocomplete="off" dir="ltr" id="ex-date" required value="'+esc(e.on_date)+'"></label><label>المبلغ ('+esc(c)+')<input  data-fmt="num" inputmode="decimal" autocomplete="off" id="ex-amt" required inputmode="decimal" dir="ltr" value="'+esc(e.amount)+'"></label>'+
       '<label>التصنيف<input id="ex-cat" list="ex-cats" required maxlength="40" value="'+esc(e.category)+'" placeholder="اختر أو اكتب"><datalist id="ex-cats">'+cats.map(function(x){return '<option value="'+esc(x)+'">';}).join('')+'</datalist></label>'+
       '<label class="grow">بماذا صُرف هذا المبلغ؟<input id="ex-desc" required maxlength="200" value="'+esc(e.description)+'" placeholder="مثال: إيجار شهر أكتوبر"></label>'+
       '<button class="btn sm primary" type="submit">'+(editExp?'حفظ التعديل':'إضافة مصروف')+'</button>'+(editExp?'<button class="btn sm" type="button" id="ex-x">إلغاء</button>':'')+'</form>'+
-      '<table class="imp"><thead><tr><th>التاريخ</th><th>التصنيف</th><th>البيان</th><th>سجّله</th><th>المبلغ</th><th></th></tr></thead><tbody>'+
+      (STAFF?'':'<table class="imp"><thead><tr><th>التاريخ</th><th>التصنيف</th><th>البيان</th><th>سجّله</th><th>المبلغ</th><th></th></tr></thead><tbody>'+
       (list.length?list.map(function(x){ var mine=!STAFF||(x.created_by&&x.created_by===ME); return '<tr data-id="'+esc(x.id)+'"><td dir="ltr">'+esc(x.on_date)+'</td><td>'+esc(x.category)+'</td><td>'+esc(x.description)+'</td><td class="sub">'+esc(x.created_by_name||'المالك')+'</td><td class="n" dir="ltr">'+n2(x.amount)+'</td><td class="acts">'+(mine?'<button class="btn sm ex-ed" type="button">تعديل</button> <button class="btn sm ex-rm" type="button">حذف</button>':'')+'</td></tr>'; }).join(''):'<tr><td colspan="6" class="empty">لا مصروفات في هذا الشهر.</td></tr>')+
-      '</tbody>'+(list.length?'<tfoot><tr><td colspan="4">إجمالي الشهر'+(STAFF&&month<today().slice(0,7)?' (ما سجّلته أنت)':'')+'</td><td class="n" dir="ltr">'+n2(total)+'</td><td></td></tr></tfoot>':'')+'</table>';
-    bindMonth(body);
+      '</tbody>'+(list.length?'<tfoot><tr><td colspan="4">إجمالي الشهر</td><td class="n" dir="ltr">'+n2(total)+'</td><td></td></tr></tfoot>':'')+'</table>');
+    if(!STAFF) bindMonth(body);
     var f=body.querySelector('#ex-f');
     if(editExp) body.querySelector('#ex-x').onclick=function(){ editExp=null; formId=null; render(); };
     f.onsubmit=async function(ev){
@@ -1515,7 +1515,7 @@ function openMoney(){
       try{
         if(editExp) await w('PATCH','/rest/v1/expenses?id=eq.'+editExp.id,row);
         else { row.id=formId; try{ await w('POST','/rest/v1/expenses',row); }catch(e){ if(e.code!=='23505') throw e; } }
-        editExp=null; formId=null; if(await load()){ month=row.on_date.slice(0,7); msg='تم الحفظ.'; msgCls='ok'; render(); }
+        editExp=null; formId=null; if(await load()){ month=row.on_date.slice(0,7); msg=STAFF?'✓ سُجّل المصروف: '+n2(row.amount)+' '+c+' — '+row.category+' ('+row.description+') بتاريخ '+row.on_date:'تم الحفظ.'; msgCls='ok'; render(); }
       }catch(e){ say(friendly(e).message,'bad'); }
     };
     body.querySelectorAll('tr[data-id]').forEach(function(tr){
