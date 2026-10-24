@@ -1425,14 +1425,14 @@ function openMoney(){
       return [p.name+(p.active?'':' (غير فعّال)'),n2(p.share),n2(p.drawn),n2(inM),n2(p.balance)]; });
     var mrows=sm.months.slice(0,12).map(function(x){ return [x.month,n2(x.income),n2(x.outflow),n2(x.net)]; });
     var drows=drM.map(function(x){ return [x.drawn_on,pn(x.partner_id),Number(x.amount)<0?'إرجاع':'سحب',x.note||'',n2(Math.abs(Number(x.amount)))]; });
-    var unp=Number(sm.unpaidTeachers||0)+Number(sm.unpaidSalaries||0);
+    var unp=Number(sm.unpaidTeachers||0)+Number(sm.unpaidSalaries||0)+Number(sm.unpaidRent||0);
     await canvasPdf({title:'تقرير الشركاء الشهري',badge:m,file:'noon-partners-'+m+'.pdf',
       cards:[['المحصّل في الشهر',n2(T0.coll),'#17703F'],['التزامات الشهر المدفوعة',n2(T0.ex+T0.ad+T0.sp+T0.tp)],['صافي الشهر',n2(T0.net),T0.net<0?'#B3261E':'#0F5F58'],
              ['الفائض منذ '+sm.start,n2(sm.net),Number(sm.net)<0?'#B3261E':'#0F5F58'],['احتياطي المركز ('+n2(sm.reservePct)+'%)',n2(sm.reserve)],['نصيب كل شريك',n2(sm.share),'#0F5F58']],
       tables:[['الشركاء',['الشريك','النصيب','المسحوب','سحب الشهر','الرصيد المتاح'],rows,[[R2(18),'right'],[R2(290),'right'],[R2(450),'right'],[R2(610),'right'],[70+18,'left']]],
               ['سحوبات وإرجاعات الشهر',['التاريخ','الشريك','النوع','ملاحظة','المبلغ'],drows,[[R2(18),'right'],[R2(210),'right'],[R2(390),'right'],[R2(500),'right'],[70+18,'left']]],
               ['الأشهر منذ بداية الحساب',['الشهر','المحصّل','الالتزامات','الصافي'],mrows,[[R2(18),'right'],[R2(300),'right'],[R2(560),'right'],[70+18,'left']]]],
-      notes:[unp>0?'ملاحظة: الفائض محسوب بعد خصم مستحقات لم تُدفع بعد (معلمون ورواتب) قدرها '+n2(unp)+' '+c+'.':'','تاريخ بداية الحساب: '+sm.start+' · نسبة الاحتياطي: '+n2(sm.reservePct)+'%'].filter(Boolean),
+      notes:[unp>0?'ملاحظة: الفائض محسوب بعد خصم مستحقات لم تُدفع بعد (معلمون ورواتب وإيجار) قدرها '+n2(unp)+' '+c+'.':'','تاريخ بداية الحساب: '+sm.start+' · نسبة الاحتياطي: '+n2(sm.reservePct)+'%'].filter(Boolean),
       foot:'تقرير داخلي للشركاء — الحساب نقدي: كل مبلغ في تاريخ دفعه فعلاً.'});
   }
   function R2(v){ return 1100-70-v; }
@@ -1478,10 +1478,11 @@ function openMoney(){
     body.innerHTML='جارٍ التحميل…'; var c=cur(), sm, dr;
     try{ sm=await rpc('partners_summary',{}); dr=await fetchAll('/rest/v1/partner_draws?select=*&order=drawn_on.desc,created_at.desc'); }catch(e){ body.innerHTML='<div class="bad">'+esc(adminErr(e))+'</div>'; return; }
     var pn=function(id){ var p=sm.partners.filter(function(x){return x.id===id;})[0]; return p?p.name:'(شريك)'; };
-    body.innerHTML='<p class="sub" style="margin-top:0">الفائض = كل ما دُفع من الطلاب منذ تاريخ البداية − (المصروفات والإيجار + السلف + رواتب الموظفين + دفعات المعلمين). تبقى نسبة احتياطي في رصيد المركز، والباقي يُقسَّم بالتساوي بين الشركاء الفعّالين. كل مبلغ يأخذه شريك يُسجَّل كسحب فيُخصم من رصيده.</p>'+
+    body.innerHTML='<p class="sub" style="margin-top:0">الفائض = كل ما دُفع من الطلاب منذ تاريخ البداية − (المصروفات والإيجار + السلف + رواتب الموظفين + دفعات المعلمين) − ما هو مستحق ولم يُدفع بعد (رواتب، معلمون، وإيجار الأشهر التي لم يُسجَّل إيجارها). تبقى نسبة احتياطي في رصيد المركز، والباقي يُقسَّم بالتساوي بين الشركاء الفعّالين. كل مبلغ يأخذه شريك يُسجَّل كسحب فيُخصم من رصيده.</p>'+
       '<div class="cards"><div class="card"><span class="l">المحصّل منذ '+esc(sm.start)+'</span><b class="t-ok">'+n2(sm.income)+' <small>'+esc(c)+'</small></b></div>'+
       '<div class="card"><span class="l">الالتزامات المدفوعة</span><b>'+n2(sm.outflow)+' <small>'+esc(c)+'</small></b></div>'+
       (Number(sm.unpaidTeachers||0)+Number(sm.unpaidSalaries||0)>0?'<div class="card"><span class="l">مستحقات لم تُدفع بعد (معلمون + رواتب)</span><b class="bad">'+n2(Number(sm.unpaidTeachers||0)+Number(sm.unpaidSalaries||0))+' <small>'+esc(c)+'</small></b></div>':'')+
+      (Number(sm.unpaidRent||0)>0?'<div class="card"><span class="l">إيجار مستحق لم يُسجَّل بعد</span><b class="bad">'+n2(sm.unpaidRent)+' <small>'+esc(c)+'</small></b></div>':'')+
       '<div class="card big"><span class="l">الفائض (الصافي)</span><b class="'+(Number(sm.net)<0?'bad':'t-ok')+'">'+n2(sm.net)+' <small>'+esc(c)+'</small></b></div>'+
       '<div class="card"><span class="l">احتياطي المركز ('+n2(sm.reservePct)+'%)</span><b>'+n2(sm.reserve)+' <small>'+esc(c)+'</small></b></div>'+
       '<div class="card"><span class="l">القابل للتوزيع</span><b>'+n2(sm.distributable)+' <small>'+esc(c)+'</small></b></div>'+
@@ -1495,8 +1496,8 @@ function openMoney(){
     body.querySelector('#pr-pdf').onclick=async function(){ var b=this, m=body.querySelector('#pr-m').value; if(!/^\d{4}-\d{2}$/.test(m||'')){ say('اختر الشهر.','bad'); return; } b.disabled=true;
       try{ await downloadPartnersReport(m,sm,dr); say('تم حفظ تقرير الشركاء.','ok'); }catch(e){ if(!(e&&e.code==='declined')) say(e&&e.local?e.message:adminErr(e),'bad'); } b.disabled=false; };
     body.querySelector('#pr-set').onclick=function(){
-      frm(box,'<label>تاريخ بداية الحساب<input name="sd" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="YYYY-MM-DD" autocomplete="off" required dir="ltr" value="'+esc(sm.start)+'"></label><label>احتياطي المركز %<input name="rp" data-fmt="num" inputmode="decimal" autocomplete="off" required dir="ltr" value="'+esc(sm.reservePct)+'"></label>',
-        async function(f){ var rp=Number(f.rp.value); if(!okDate(f.sd.value)||!(rp>=0&&rp<=100)) throw lerr('تحقق من التاريخ ونسبة الاحتياطي (0 إلى 100).'); await w('PATCH','/rest/v1/partner_settings?id=eq.1',{start_date:f.sd.value,reserve_pct:rp,updated_at:new Date().toISOString()}); },'تم حفظ الإعدادات.');
+      frm(box,'<label>تاريخ بداية الحساب<input name="sd" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="YYYY-MM-DD" autocomplete="off" required dir="ltr" value="'+esc(sm.start)+'"></label><label>احتياطي المركز %<input name="rp" data-fmt="num" inputmode="decimal" autocomplete="off" required dir="ltr" value="'+esc(sm.reservePct)+'"></label><label>الإيجار الشهري ('+esc(c)+')<input name="mr" data-fmt="num" inputmode="decimal" autocomplete="off" dir="ltr" value="'+esc(sm.monthlyRent==null?0:sm.monthlyRent)+'"></label><p class="sub" style="flex-basis:100%;margin:0">يُحجز الإيجار الشهري قبل نصيب الشركاء عن كل شهر لم يُسجَّل فيه مصروف بتصنيف «إيجار». اجعله 0 لإيقاف ذلك.</p>',
+        async function(f){ var rp=Number(f.rp.value), mr=Number(f.mr.value||0); if(!okDate(f.sd.value)||!(rp>=0&&rp<=100)) throw lerr('تحقق من التاريخ ونسبة الاحتياطي (0 إلى 100).'); if(!(mr>=0)) throw lerr('تحقق من مبلغ الإيجار الشهري.'); await w('PATCH','/rest/v1/partner_settings?id=eq.1',{start_date:f.sd.value,reserve_pct:rp,monthly_rent:mr,updated_at:new Date().toISOString()}); },'تم حفظ الإعدادات.');
     };
     body.querySelectorAll('tr[data-id]').forEach(function(tr){
       var p=sm.partners.filter(function(x){return x.id===tr.dataset.id;})[0];
