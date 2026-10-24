@@ -2657,6 +2657,15 @@ html .stat .st-more b{color:var(--fg)}
 .wa-pick{position:fixed;z-index:10050;background:var(--surface,#fff);color:var(--ink,inherit);border:1px solid var(--line,rgba(0,0,0,.12));border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:10px;display:flex;flex-direction:column;gap:6px;min-width:200px;direction:rtl}
 .wa-pick .wp-t{font-size:.85em;opacity:.75;margin-bottom:2px}
 .wa-pick .btn{justify-content:space-between;width:100%}
+
+/* student photos */
+.th-ph-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.th-ph-img{width:64px;height:64px;border-radius:16px;border:2px dashed var(--line);display:inline-block;overflow:hidden;background:var(--surface2,#f4f4f4)}
+.th-ph-img.on{border:2px solid var(--gold,#C9A033)}
+.th-ph-img img,.th-av img{width:100%;height:100%;object-fit:cover;display:block}
+#d-head h2 .th-av{width:58px;height:58px;border-radius:16px;overflow:hidden;padding:0;border:2px solid var(--gold,#C9A033);cursor:zoom-in;flex:none;background:none;box-shadow:0 6px 14px rgba(203,161,49,.3)}
+html #d-head.has-ph h2::before{display:none}
+#d-head h2 .th-ph-add{font-size:.55em;padding:2px 10px;margin-inline-start:6px;vertical-align:middle}
 </style>
 
 <div id="app" dir="rtl" lang="ar">
@@ -4120,7 +4129,7 @@ function receiptModel(){
   var r=D.byId[S.rc.sid]; if(!r) return null;
   var s=r.subs.filter(function(x){ return x.id===S.rc.sub; })[0]; if(!s) return null;
   var pays=r.pays.filter(function(p){ return p.subId===s.id; }).slice().sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:((a.at||0)-(b.at||0))); });
-  return {no:receiptNo(s),center:S.settings.centerName,cur:S.settings.currency,name:r.st.name,course:s.course||'',session:s.kind==='session',start:s.start,end:s.end,months:s.months,fee:s.fee,paid:s.paid,remaining:s.remaining,pays:pays,today:todayStr(),addr:S.settings.address||'',phone:S.settings.phone||'',rnote:S.settings.receiptNote||'',days:s.kind==='pack'?rcDays(s.id):[],pack:s.kind==='pack'?{total:(Number(s.sessionsTotal)||0)+(Number(s.sessionsAdjust)||0),left:s.left}:null,subjects:s.subjects||'',discount:Number(s.discount)||0,discountPct:s.discountPct||0,discountReason:s.discountReason||'',discountBy:s.discountBy||''};
+  return {no:receiptNo(s),center:S.settings.centerName,cur:S.settings.currency,name:r.st.name,course:s.course||'',session:s.kind==='session',start:s.start,end:s.end,months:s.months,fee:s.fee,paid:s.paid,remaining:s.remaining,pays:pays,today:todayStr(),addr:S.settings.address||'',phone:S.settings.phone||'',rnote:S.settings.receiptNote||'',photo:(RC.ph&&RC.ph.sid===r.st.id)?RC.ph.img:null,days:s.kind==='pack'?rcDays(s.id):[],pack:s.kind==='pack'?{total:(Number(s.sessionsTotal)||0)+(Number(s.sessionsAdjust)||0),left:s.left}:null,subjects:s.subjects||'',discount:Number(s.discount)||0,discountPct:s.discountPct||0,discountReason:s.discountReason||'',discountBy:s.discountBy||''};
 }
 function drawReceipt(m){
   var W=RC.W, SC=RC.SC, rows=Math.max(m.pays.length,1), daysH=(m.days&&m.days.length)?84+m.days.length*46:0, H=706+rows*58+440+(m.subjects?130:0)+daysH+((m.addr||m.phone||m.rnote)?80:0), dy=(m.subjects?130:0)+daysH;
@@ -4142,7 +4151,8 @@ function drawReceipt(m){
   // details
   function cell(xr,y,w,label,val,big){ T(label,xr,y,24,500,MU); T(val,xr,y+(big?52:44),fit(val,w-10,big?42:32,700),700,INK); }
   var colW=(W-2*M-40)/2, xr1=R, xr2=R-colW-40;
-  cell(R,262,W-2*M,'الطالب',m.name,true); hl(345);
+  if(m.photo){ var PS=112, px=M, py=219; c.save(); rr(px,py,PS,PS,16); c.clip(); var iw=m.photo.naturalWidth||m.photo.width, ih=m.photo.naturalHeight||m.photo.height, sq=Math.min(iw,ih); c.drawImage(m.photo,(iw-sq)/2,(ih-sq)/2,sq,sq,px,py,PS,PS); c.restore(); c.strokeStyle=GD; c.lineWidth=3; rr(px,py,PS,PS,16); c.stroke(); }
+  cell(R,262,W-2*M-(m.photo?140:0),'الطالب',m.name,true); hl(345);
   cell(xr1,385,colW,'الدورة',m.course||'—');
   cell(xr2,385,colW,'نوع الاشتراك',m.session?'حصة منفردة':m.pack?'باقة '+m.pack.total+' حصة':'اشتراك شهري ('+(m.months||1)+' شهر)');
   if(m.session){ cell(xr1,495,colW,'تاريخ الحصة',fmtDate(m.start)); }
@@ -4214,7 +4224,7 @@ async function renderReceipt(){
   var m=receiptModel();
   if(!m){ closeReceipt(); return null; }
   var tk=++RC.token;
-  await rcFonts();
+  await rcFonts(); try{ await rcPhotoLoad(S.rc&&S.rc.sid); }catch(e){}
   if(tk!==RC.token||$('#rcpt').hidden) return null;
   var m2=receiptModel(); if(!m2){ closeReceipt(); return null; }
   var cv=drawReceipt(m2);
@@ -6064,6 +6074,86 @@ document.addEventListener('click',async function(e){
   // the general attendance treats a declared day off like a weekly day off
   var _off=thOff; thOff=function(day){ return _off.apply(this,arguments)||holOffs(day).length>0; };
 })();
+
+
+/* ===== student photos: a small square JPEG per student, in the file, the form and the receipt ===== */
+var PH={cache:{},pending:undefined};
+function phGet(id){
+  if(!id) return Promise.resolve(null);
+  if(Object.prototype.hasOwnProperty.call(PH.cache,id)) return Promise.resolve(PH.cache[id]);
+  return window.NOON_API.http('GET','/rest/v1/student_photos?select=data&student_id=eq.'+encodeURIComponent(id)).then(function(r){
+    var d=(r.data&&r.data[0]&&r.data[0].data)||null; if(Object.prototype.hasOwnProperty.call(PH.cache,id)) return PH.cache[id]; PH.cache[id]=d; return d; }).catch(function(){ return null; });
+}
+async function phSave(id,data){
+  var api=window.NOON_API;
+  if(data) await api.http('POST','/rest/v1/student_photos?on_conflict=student_id',{body:[{student_id:id,data:data,updated_at:new Date().toISOString()}],headers:{Prefer:'resolution=merge-duplicates,return=minimal'}});
+  else await api.http('DELETE','/rest/v1/student_photos?student_id=eq.'+encodeURIComponent(id),{headers:{Prefer:'return=minimal'}});
+  PH.cache[id]=data||null;
+}
+function phResize(file){
+  return new Promise(function(res,rej){
+    if(!file||!/^image\//.test(file.type||'')){ rej(new Error('اختر ملف صورة.')); return; }
+    var url=URL.createObjectURL(file), im=new Image();
+    im.onload=function(){ try{ var S2=320, iw=im.naturalWidth, ih=im.naturalHeight, sq=Math.min(iw,ih), cv=document.createElement('canvas'); cv.width=S2; cv.height=S2;
+      var c=cv.getContext('2d'); c.fillStyle='#fff'; c.fillRect(0,0,S2,S2); c.drawImage(im,(iw-sq)/2,(ih-sq)/2,sq,sq,0,0,S2,S2); URL.revokeObjectURL(url); res(cv.toDataURL('image/jpeg',0.82)); }catch(e){ rej(e); } };
+    im.onerror=function(){ URL.revokeObjectURL(url); rej(new Error('تعذرت قراءة الصورة.')); };
+    im.src=url;
+  });
+}
+function phPick(cb){ var inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.style.display='none'; document.body.appendChild(inp);
+  inp.onchange=function(){ var f=inp.files&&inp.files[0]; inp.remove(); if(!f) return; phResize(f).then(cb).catch(function(e){ toast(e.message||'تعذرت قراءة الصورة'); }); }; inp.click(); }
+/* receipt: preload the photo before drawing */
+async function rcPhotoLoad(sid){
+  if(!sid){ RC.ph=null; return; }
+  var d=await phGet(sid); if(!d){ RC.ph=null; return; }
+  if(RC.ph&&RC.ph.sid===sid&&RC.ph.src===d) return;
+  await new Promise(function(res){ var im=new Image(); im.onload=function(){ RC.ph={sid:sid,src:d,img:im}; res(); }; im.onerror=function(){ RC.ph=null; res(); }; im.src=d; });
+}
+/* the student form: a photo field on top */
+function phFormField(){
+  var f=document.getElementById('f-student'); if(!f||f.querySelector('.th-ph')) return;
+  var id=f.dataset.id||''; PH.pending=undefined;
+  var box=document.createElement('div'); box.className='field wide th-ph';
+  box.innerHTML='<label>صورة الطالب (اختياري)</label><div class="th-ph-row"><span class="th-ph-img" id="ph-prev"></span><button class="btn sm" type="button" data-xact="ph-pick">اختيار صورة / التقاط</button><button class="btn sm" type="button" data-xact="ph-clear" hidden>إزالة الصورة</button></div>';
+  var g=f.querySelector('.fgrid'); if(g) g.insertBefore(box,g.firstChild); else f.insertBefore(box,f.firstChild);
+  function show(d){ var pv=box.querySelector('#ph-prev'); pv.innerHTML=d?'<img alt="" src="'+d+'">':''; pv.classList.toggle('on',!!d); box.querySelector('[data-xact="ph-clear"]').hidden=!d; }
+  box.__show=show;
+  if(id) phGet(id).then(function(d){ if(PH.pending===undefined) show(d); });
+}
+document.addEventListener('click',function(e){
+  var el=e.target.closest&&e.target.closest('[data-xact="ph-pick"],[data-xact="ph-clear"],[data-xact="ph-add"],[data-xact="ph-view"],[data-xact="ph-change"],[data-xact="ph-del"]'); if(!el) return;
+  var a=el.dataset.xact, box=el.closest('.th-ph');
+  if(a==='ph-pick'){ phPick(function(d){ PH.pending=d; if(box&&box.__show) box.__show(d); }); return; }
+  if(a==='ph-clear'){ PH.pending=null; if(box&&box.__show) box.__show(null); return; }
+  var id=S.detailId; if(!id) return;
+  if(a==='ph-add'||a==='ph-change'){ phPick(async function(d){ try{ await phSave(id,d); closeX(); toast('حُفظت الصورة'); renderDetail(); }catch(er){ toast('تعذر حفظ الصورة: '+errMsg(er)); } }); return; }
+  if(a==='ph-view'){ phGet(id).then(function(d){ if(!d) return; var r=D.byId[id]; xModal(r?r.st.name:'صورة الطالب','<div style="text-align:center"><img alt="" src="'+d+'" style="width:min(320px,100%);border-radius:16px"></div><div class="row" style="justify-content:center;margin-top:12px"><button class="btn sm primary" type="button" data-xact="ph-change">تغيير الصورة</button><button class="btn sm danger" type="button" data-xact="ph-del">حذف الصورة</button></div>'); }); return; }
+  if(a==='ph-del'){ if(!confirm('حذف صورة الطالب؟')) return; phSave(id,null).then(function(){ closeX(); toast('حُذفت الصورة'); renderDetail(); }).catch(function(er){ toast('تعذر الحذف: '+errMsg(er)); }); }
+});
+/* save the chosen photo together with the student */
+(function(){
+  var _ss=submitStudent; submitStudent=async function(form){
+    var pend=PH.pending, editId=form&&form.dataset.id;
+    var out=await _ss.apply(this,arguments);
+    if(pend!==undefined&&!document.body.contains(form)){
+      var id=editId||S.detailId;
+      if(id){ try{ await phSave(id,pend); PH.pending=undefined; if(S.detailId===id) renderDetail(); }catch(e){ toast('حُفظ الطالب، لكن تعذر حفظ الصورة: '+errMsg(e)); } }
+    }
+    return out;
+  };
+  var ov=document.getElementById('overlay'); if(ov&&window.MutationObserver) new MutationObserver(function(){ if(!ov.hidden) setTimeout(phFormField,0); }).observe(ov,{childList:true,subtree:true});
+})();
+/* the student's file: the photo beside the name */
+function decoDetailPhoto(){
+  var id=S.detailId, head=document.getElementById('d-head'); if(!id||!head) return;
+  var h2=head.querySelector('h2'); if(!h2||h2.querySelector('.th-av')) return;
+  phGet(id).then(function(d){
+    if(S.detailId!==id||!h2.isConnected||h2.querySelector('.th-av')) return;
+    if(d){ var b=document.createElement('button'); b.type='button'; b.className='th-av'; b.dataset.xact='ph-view'; b.title='الصورة'; b.innerHTML='<img alt="" src="'+d+'">'; h2.insertBefore(b,h2.firstChild); head.classList.add('has-ph'); }
+    else { var a=document.createElement('button'); a.type='button'; a.className='btn sm th-ph-add'; a.dataset.xact='ph-add'; a.textContent='+ صورة'; h2.appendChild(a); head.classList.remove('has-ph'); }
+  });
+}
+(function(){ var _rd=renderDetail; renderDetail=function(){ _rd.apply(this,arguments); try{ decoDetailPhoto(); }catch(e){ if(window.console) console.error(e); } }; })();
 
 
 window.__app={buildBackup:buildBackup,downloadBackup:downloadBackup,buildPdf:buildPdf};
