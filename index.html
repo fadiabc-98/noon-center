@@ -255,7 +255,7 @@ async function loadProfile(){
 }
 function applyRole(){
   var role=profile&&profile.role||'owner';
-  window.CLOUD.role=role;
+  window.CLOUD.role=role; window.CLOUD.uid=(typeof session!=='undefined'&&session&&session.user_id)||'';
   document.documentElement.classList.toggle('role-staff',role==='staff');
   document.documentElement.classList.toggle('role-owner',role!=='staff');
 }
@@ -1095,11 +1095,12 @@ function openWipe(){
 
 /* ===== expenses & payroll ===== */
 function openMoney(){
-  if(!ownerOnly()) return;
-  var sh=modalShell('المصروفات والرواتب',true,'noon-nav-money'), bd=sh.bd;
-  var D={employees:[],salaries:[],advances:[],pays:[],expenses:[],teachers:[],terms:[],tpays:[]}, tab='sum', month=today().slice(0,7), editExp=null, formId=null, msg='', msgCls='';
+  var STAFF=window.CLOUD.role==='staff', ME=window.CLOUD.uid||'';
+  var sh=modalShell(STAFF?'المصروفات':'المصروفات والرواتب',true,STAFF?'noon-nav-exp':'noon-nav-money'), bd=sh.bd;
+  var D={employees:[],salaries:[],advances:[],pays:[],expenses:[],teachers:[],terms:[],tpays:[]}, tab=STAFF?'exp':'sum', month=today().slice(0,7), editExp=null, formId=null, msg='', msgCls='';
   bd.innerHTML='جارٍ التحميل…';
   async function load(){
+    if(STAFF){ try{ D.expenses=await fetchAll('/rest/v1/expenses?select=*&order=on_date.desc,created_at.desc'); }catch(e){ bd.innerHTML='<div class="bad">'+esc(friendly(e).message)+'</div>'; return false; } return true; }
     try{
       var r=await Promise.all([fetchAll('/rest/v1/employees?select=*&order=created_at.asc'),fetchAll('/rest/v1/employee_salaries?select=*&order=from_date.asc'),
         fetchAll('/rest/v1/advances?select=*&order=on_date.asc,created_at.asc'),fetchAll('/rest/v1/salary_payments?select=*&order=period_start.asc'),fetchAll('/rest/v1/expenses?select=*&order=on_date.desc,created_at.desc'),
@@ -1124,6 +1125,7 @@ function openMoney(){
   }
   function render(){
     var head='<div class="tabs"><button type="button" data-t="sum"'+(tab==='sum'?' class="on"':'')+'>ملخص الشهر</button><button type="button" data-t="day"'+(tab==='day'?' class="on"':'')+'>الدخل اليومي</button><button type="button" data-t="exp"'+(tab==='exp'?' class="on"':'')+'>المصروفات</button><button type="button" data-t="emp"'+(tab==='emp'?' class="on"':'')+'>الموظفون والرواتب</button><button type="button" data-t="fin"'+(tab==='fin'?' class="on"':'')+'>اللوحة المالية</button><button type="button" data-t="cash"'+(tab==='cash'?' class="on"':'')+'>إقفال الصندوق</button><button type="button" data-t="tch"'+(tab==='tch'?' class="on"':'')+'>المعلمون</button><button type="button" data-t="par"'+(tab==='par'?' class="on"':'')+'>الشركاء</button><button type="button" data-t="year"'+(tab==='year'?' class="on"':'')+'>المقارنة السنوية</button></div><div id="mn-msg" class="sub '+msgCls+'">'+esc(msg)+'</div>';
+    if(STAFF) head='<p class="sub" style="margin:0 0 8px">سجّل هنا ما صُرف من الدرج. تظهر لك مصروفات هذا الشهر كلها حتى لا يتكرر التسجيل، وتستطيع تعديل أو حذف ما سجّلته أنت فقط.</p><div id="mn-msg" class="sub '+msgCls+'">'+esc(msg)+'</div>';
     bd.innerHTML=head+'<div id="mn-body"></div>';
     bd.querySelectorAll('.tabs button').forEach(function(b){ b.onclick=function(){ tab=b.dataset.t; msg=''; render(); }; });
     var body=bd.querySelector('#mn-body');
@@ -1499,9 +1501,9 @@ function openMoney(){
       '<label>التصنيف<input id="ex-cat" list="ex-cats" required maxlength="40" value="'+esc(e.category)+'" placeholder="اختر أو اكتب"><datalist id="ex-cats">'+cats.map(function(x){return '<option value="'+esc(x)+'">';}).join('')+'</datalist></label>'+
       '<label class="grow">بماذا صُرف هذا المبلغ؟<input id="ex-desc" required maxlength="200" value="'+esc(e.description)+'" placeholder="مثال: إيجار شهر أكتوبر"></label>'+
       '<button class="btn sm primary" type="submit">'+(editExp?'حفظ التعديل':'إضافة مصروف')+'</button>'+(editExp?'<button class="btn sm" type="button" id="ex-x">إلغاء</button>':'')+'</form>'+
-      '<table class="imp"><thead><tr><th>التاريخ</th><th>التصنيف</th><th>البيان</th><th>المبلغ</th><th></th></tr></thead><tbody>'+
-      (list.length?list.map(function(x){ return '<tr data-id="'+esc(x.id)+'"><td dir="ltr">'+esc(x.on_date)+'</td><td>'+esc(x.category)+'</td><td>'+esc(x.description)+'</td><td class="n" dir="ltr">'+n2(x.amount)+'</td><td class="acts"><button class="btn sm ex-ed" type="button">تعديل</button> <button class="btn sm ex-rm" type="button">حذف</button></td></tr>'; }).join(''):'<tr><td colspan="5" class="empty">لا مصروفات في هذا الشهر.</td></tr>')+
-      '</tbody>'+(list.length?'<tfoot><tr><td colspan="3">إجمالي الشهر</td><td class="n" dir="ltr">'+n2(total)+'</td><td></td></tr></tfoot>':'')+'</table>';
+      '<table class="imp"><thead><tr><th>التاريخ</th><th>التصنيف</th><th>البيان</th><th>سجّله</th><th>المبلغ</th><th></th></tr></thead><tbody>'+
+      (list.length?list.map(function(x){ var mine=!STAFF||(x.created_by&&x.created_by===ME); return '<tr data-id="'+esc(x.id)+'"><td dir="ltr">'+esc(x.on_date)+'</td><td>'+esc(x.category)+'</td><td>'+esc(x.description)+'</td><td class="sub">'+esc(x.created_by_name||'المالك')+'</td><td class="n" dir="ltr">'+n2(x.amount)+'</td><td class="acts">'+(mine?'<button class="btn sm ex-ed" type="button">تعديل</button> <button class="btn sm ex-rm" type="button">حذف</button>':'')+'</td></tr>'; }).join(''):'<tr><td colspan="6" class="empty">لا مصروفات في هذا الشهر.</td></tr>')+
+      '</tbody>'+(list.length?'<tfoot><tr><td colspan="4">إجمالي الشهر'+(STAFF&&month<today().slice(0,7)?' (ما سجّلته أنت)':'')+'</td><td class="n" dir="ltr">'+n2(total)+'</td><td></td></tr></tfoot>':'')+'</table>';
     bindMonth(body);
     var f=body.querySelector('#ex-f');
     if(editExp) body.querySelector('#ex-x').onclick=function(){ editExp=null; formId=null; render(); };
@@ -1518,6 +1520,7 @@ function openMoney(){
     };
     body.querySelectorAll('tr[data-id]').forEach(function(tr){
       var id=tr.dataset.id;
+      if(!tr.querySelector('.ex-ed')) return;
       tr.querySelector('.ex-ed').onclick=function(){ editExp=D.expenses.filter(function(x){return x.id===id;})[0]; formId=null; render(); };
       tr.querySelector('.ex-rm').onclick=async function(){
         if(!confirm('حذف هذا المصروف؟ سيبقى أثر الحذف في سجل التحركات.')) return;
@@ -1642,7 +1645,7 @@ function injectUi(){
   '.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:10px 0}.cards.sm{margin:8px 0}.noon-modal .card{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface2);display:flex;flex-direction:column;gap:4px}.noon-modal .card .l{font-size:12px;color:var(--muted)}.noon-modal .card b{font-size:18px}.noon-modal .card.big{border-width:2px}.noon-modal .card.emp{margin-bottom:12px;background:var(--surface)}.noon-modal .card.off{opacity:.65}'+
   '.eh{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;justify-content:space-between}.advs{margin:4px 0;padding-inline-start:20px;font-size:13px}.row.wrap{flex-wrap:wrap}.t-ok{color:var(--ok)}'+
   '.frm label.grow{flex:1;min-width:200px}.frm input,.frm select{width:100%;box-sizing:border-box}.frm label{min-width:130px}.noon-modal h3.sec{margin:18px 0 6px;font-size:15px}.noon-modal .steps{padding-inline-start:20px}.pwbox{border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:10px;background:var(--surface2)}.mp{display:inline-flex;gap:8px;align-items:center;font-weight:600;margin-bottom:8px}td.n{text-align:left}'+
-  '.role-staff #noon-nav-log,.role-staff #noon-nav-money,.role-staff #noon-nav-accounts,.role-staff #noon-nav-trash,.role-staff #noon-nav-wipe,.role-staff .tab-btn[data-tab="backup"],.role-staff #backupState,.role-staff [data-act="del-student"],.role-staff .bn button[data-tab="backup"]{display:none!important}';
+  '.role-owner #noon-nav-exp,.role-staff #noon-nav-log,.role-staff #noon-nav-money,.role-staff #noon-nav-accounts,.role-staff #noon-nav-trash,.role-staff #noon-nav-wipe,.role-staff .tab-btn[data-tab="backup"],.role-staff #backupState,.role-staff [data-act="del-student"],.role-staff .bn button[data-tab="backup"]{display:none!important}';
   document.head.appendChild(st);
   pill=document.createElement('div'); pill.id='noon-pill'; pill.title='اضغط لتحديث البيانات الآن'; document.body.appendChild(pill); setStatus('init');
   pill.onclick=function(){ syncNow(true); };
@@ -1654,6 +1657,9 @@ function injectUi(){
     var m=document.createElement('button'); m.className='tab-btn'; m.type='button'; m.id='noon-nav-money';
     m.innerHTML='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 10v4M18 10v4"/></svg><span>المصروفات والرواتب</span>';
     m.onclick=function(){ openMoney(); }; nav.appendChild(m);
+    var ex=document.createElement('button'); ex.className='tab-btn'; ex.type='button'; ex.id='noon-nav-exp';
+    ex.innerHTML='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 10v4M18 10v4"/></svg><span>المصروفات</span>';
+    ex.onclick=function(){ openMoney(); }; nav.appendChild(ex);
     var a=document.createElement('button'); a.className='tab-btn'; a.type='button'; a.id='noon-nav-accounts';
     a.innerHTML='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M17 11l2 2 3-4"/></svg><span>إدارة الحسابات</span>';
     a.onclick=function(){ openAccounts(); }; nav.appendChild(a);
@@ -4680,7 +4686,7 @@ function openMore(){
   function visible(b){ return b&&getComputedStyle(b).display!=='none'; }
   function add(btn){ if(!btn||!visible(btn)) return; var lab=(btn.querySelector('span')||btn).textContent.trim(), s=btn.querySelector('svg'); rows.push({lab:lab,svg:s?s.outerHTML:'',el:btn}); }
   side.forEach(function(s){ add(document.querySelector('.nav .tab-btn[data-tab="'+s[0]+'"]')); });
-  ['noon-nav-today','noon-nav-log','noon-nav-money','noon-nav-tt','noon-nav-inq','noon-nav-trash','noon-nav-wipe','noon-nav-accounts'].forEach(function(id){ add(document.getElementById(id)); });
+  ['noon-nav-today','noon-nav-log','noon-nav-money','noon-nav-exp','noon-nav-tt','noon-nav-inq','noon-nav-trash','noon-nav-wipe','noon-nav-accounts'].forEach(function(id){ add(document.getElementById(id)); });
   var who=(document.getElementById('noon-who')||{}).textContent||'', st=(document.getElementById('saveState')||{}).textContent||'';
   var o=xModal('المزيد','<div class="more-who sub">'+esc(who)+(st?' · '+esc(st):'')+'</div><div class="more-list">'+rows.map(function(r,i){ return '<button type="button" class="more-item" data-xact="more-go" data-i="'+i+'">'+r.svg+'<span>'+esc(r.lab)+'</span></button>'; }).join('')+
     (document.getElementById('noon-logout')?'<button type="button" class="more-item out" data-xact="more-out"><span>تسجيل الخروج</span></button>':'')+'</div>');
