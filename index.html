@@ -824,7 +824,7 @@ function adminErr(e){
   var m=String(e&&e.message||'');
   var map={no_such_user:'لا يوجد مستخدم بهذا البريد في Supabase. أنشئه أولاً من لوحة Authentication ← Users (مع Auto Confirm) ثم أعد المحاولة.',already_member:'هذا الحساب مضاف مسبقاً.',
     password_short:'كلمة السر قصيرة: 12 حرفاً على الأقل.',password_in_use:'كلمة السر هذه مستعملة لحساب آخر. الدخول بكلمة السر فقط يتطلب أن تكون مختلفة لكل حساب.',
-    parent_missing:'لا يمكن استرجاع هذا العنصر لأن الطالب المرتبط به محذوف. استرجع الطالب أولاً.',already_exists:'هذا السجل موجود بالفعل.',not_found:'العنصر غير موجود في السلة (ربما استُرجع).',future_day:'لا يمكن إقفال يوم بعيد في المستقبل.',bad_amount:'أدخل المبلغ الفعلي الموجود في الدرج.',last_owner:'لا يمكن إزالة آخر مالك أو تحويله إلى موظف.',cannot_remove_self:'لا يمكنك سحب صلاحية حسابك الحالي.',name_required:'الاسم مطلوب.',no_such_account:'الحساب غير موجود.'};
+    parent_missing:'لا يمكن استرجاع هذا العنصر لأن الطالب المرتبط به محذوف. استرجع الطالب أولاً.',already_exists:'هذا السجل موجود بالفعل.',not_found:'العنصر غير موجود في السلة (ربما استُرجع).',future_day:'لا يمكن إقفال يوم بعيد في المستقبل.',bad_amount:'أدخل المبلغ الفعلي الموجود في الدرج.',last_owner:'لا يمكن إزالة آخر مالك أو تحويله إلى موظف.',cannot_remove_self:'لا يمكنك سحب صلاحية حسابك الحالي.',name_required:'الاسم مطلوب.',no_such_account:'الحساب غير موجود.',later_closed:'الإقفال يكون بالترتيب: يوجد إقفال ليوم لاحق. احذف الإقفالات الأحدث أولاً.'};
   for(var k in map){ if(m.indexOf(k)>=0) return map[k]; }
   var fm=friendly(e).message;
   if(/^تعذر تنفيذ العملية على الخادم/.test(fm)&&m) fm+=' [تفاصيل للمطوّر: '+m.slice(0,160)+']';
@@ -1106,11 +1106,14 @@ function openMoney(){
         fetchAll('/rest/v1/advances?select=*&order=on_date.asc,created_at.asc'),fetchAll('/rest/v1/salary_payments?select=*&order=period_start.asc'),fetchAll('/rest/v1/expenses?select=*&order=on_date.desc,created_at.desc'),
         fetchAll('/rest/v1/teachers?select=*&order=created_at.asc'),fetchAll('/rest/v1/teacher_terms?select=*&order=from_date.asc'),fetchAll('/rest/v1/teacher_payments?select=*&order=paid_on.desc,created_at.desc')]);
       D.employees=r[0]; D.salaries=r[1]; D.advances=r[2]; D.pays=r[3]; D.expenses=r[4]; D.teachers=r[5]; D.terms=r[6]; D.tpays=r[7];
+      try{ D.trs=await rpc('treasury_status',{}); }catch(e){ D.trs=null; }
       window.NOON_TEACHERS=D.teachers.map(function(t){ return {id:t.id,name:t.name,active:t.active}; });
       D.employees.forEach(function(e){ empNames[e.id]=e.name; });
     }catch(e){ bd.innerHTML='<div class="bad">'+esc(friendly(e).message)+'</div>'; return false; }
     return true;
   }
+  var BOXN={drawer:'الدرج',safe:'الخزينة',bank:'المصرف'};
+  function srcFor(cat){ var l=(D.trs&&D.trs.safe_cats)||['إيجار']; return l.indexOf(String(cat||'').trim())>=0?'safe':'drawer'; }
   function say(t,c){ msg=t; msgCls=c||''; var m=bd.querySelector('#mn-msg'); if(m){ m.textContent=t; m.className='sub '+(c||''); } }
   function emp(id){ return D.employees.filter(function(e){return e.id===id;})[0]; }
   function inRange(d,a,b){ return d>=a&&d<=b; }
@@ -1124,12 +1127,12 @@ function openMoney(){
     return {sal:s,adv:adv,advSum:advSum,remaining:s==null?null:s-advSum,paid:paid};
   }
   function render(){
-    var head='<div class="tabs"><button type="button" data-t="sum"'+(tab==='sum'?' class="on"':'')+'>ملخص الشهر</button><button type="button" data-t="day"'+(tab==='day'?' class="on"':'')+'>الدخل اليومي</button><button type="button" data-t="exp"'+(tab==='exp'?' class="on"':'')+'>المصروفات</button><button type="button" data-t="emp"'+(tab==='emp'?' class="on"':'')+'>الموظفون والرواتب</button><button type="button" data-t="fin"'+(tab==='fin'?' class="on"':'')+'>اللوحة المالية</button><button type="button" data-t="cash"'+(tab==='cash'?' class="on"':'')+'>إقفال الصندوق</button><button type="button" data-t="tch"'+(tab==='tch'?' class="on"':'')+'>المعلمون</button><button type="button" data-t="par"'+(tab==='par'?' class="on"':'')+'>الشركاء</button><button type="button" data-t="year"'+(tab==='year'?' class="on"':'')+'>المقارنة السنوية</button></div><div id="mn-msg" class="sub '+msgCls+'">'+esc(msg)+'</div>';
+    var head='<div class="tabs"><button type="button" data-t="sum"'+(tab==='sum'?' class="on"':'')+'>ملخص الشهر</button><button type="button" data-t="day"'+(tab==='day'?' class="on"':'')+'>الدخل اليومي</button><button type="button" data-t="exp"'+(tab==='exp'?' class="on"':'')+'>المصروفات</button><button type="button" data-t="emp"'+(tab==='emp'?' class="on"':'')+'>الموظفون والرواتب</button><button type="button" data-t="fin"'+(tab==='fin'?' class="on"':'')+'>اللوحة المالية</button><button type="button" data-t="cash"'+(tab==='cash'?' class="on"':'')+'>إقفال الدرج</button><button type="button" data-t="trs"'+(tab==='trs'?' class="on"':'')+'>الخزينة</button><button type="button" data-t="tch"'+(tab==='tch'?' class="on"':'')+'>المعلمون</button><button type="button" data-t="par"'+(tab==='par'?' class="on"':'')+'>الشركاء</button><button type="button" data-t="year"'+(tab==='year'?' class="on"':'')+'>المقارنة السنوية</button></div><div id="mn-msg" class="sub '+msgCls+'">'+esc(msg)+'</div>';
     if(STAFF) head='<p class="sub" style="margin:0 0 8px">سجّل هنا ما يُسحب من الدرج. بعد الحفظ لا يمكن تعديل المصروف أو حذفه من هنا، فراجع المبلغ قبل الضغط على «إضافة مصروف». لتصحيح أي خطأ أبلغ المالك.</p><div id="mn-msg" class="sub '+msgCls+'">'+esc(msg)+'</div>';
     bd.innerHTML=head+'<div id="mn-body"></div>';
     bd.querySelectorAll('.tabs button').forEach(function(b){ b.onclick=function(){ tab=b.dataset.t; msg=''; render(); }; });
     var body=bd.querySelector('#mn-body');
-    if(tab==='sum') renderSum(body); else if(tab==='day') renderDay(body); else if(tab==='exp') renderExp(body); else if(tab==='fin') renderFin(body); else if(tab==='cash') renderCash(body); else if(tab==='tch') renderTeachers(body); else if(tab==='par') renderPartners(body); else if(tab==='year') renderYear(body); else renderEmp(body);
+    if(tab==='sum') renderSum(body); else if(tab==='day') renderDay(body); else if(tab==='exp') renderExp(body); else if(tab==='fin') renderFin(body); else if(tab==='cash') renderCash(body); else if(tab==='trs') renderTreasury(body); else if(tab==='tch') renderTeachers(body); else if(tab==='par') renderPartners(body); else if(tab==='year') renderYear(body); else renderEmp(body);
   }
   function monthPicker(){ return '<label class="mp">الشهر <input data-fmt="month" inputmode="numeric" maxlength="7" placeholder="YYYY-MM" autocomplete="off" dir="ltr" id="mn-month" value="'+esc(month)+'"></label>'; }
   function bindMonth(body){ body.querySelector('#mn-month').onchange=function(){ if(/^\d{4}-(0[1-9]|1[0-2])$/.test(this.value)){ month=this.value; render(); } else say('اكتب الشهر هكذا: 2026-10','bad'); }; }
@@ -1215,25 +1218,107 @@ function openMoney(){
     body.innerHTML='جارٍ التحميل…'; var day=cashDay, c=cur();
     Promise.all([rpc('cash_summary',{p_day:day}),http('GET','/rest/v1/cash_closings?select=*&order=day.desc&limit=30')]).then(function(r){
       var s=(r[0]&&r[0][0])||{collected:0,transfers:0,expenses:0,advances:0,salaries:0,teachers:0}, list=r[1].data||[];
-      var coll=Number(s.collected), trf=Number(s.transfers), tch=Number(s.teachers), ex=Number(s.expenses), ad=Number(s.advances), sa=Number(s.salaries), exp=coll-trf-ex-ad-sa-tch;
+      var NEW=!!s.started, trf=Number(s.transfers), exp=Number(s.expected), flt=Number(s.float_amt)||0;
       var done=list.filter(function(x){return x.day===day;})[0];
-      body.innerHTML='<p class="sub" style="margin-top:0">في آخر اليوم عُدّ ما في الدرج وقارنه بما سجّلته المنظومة. أي فرق يُحفظ بتاريخه لتراجعه لاحقاً. المتوقع في الدرج = المحصّل نقداً (دون الحوالات) − المصروفات − السلف − الرواتب − دفعات المعلمين في ذلك اليوم.</p>'+
+      var cards=NEW?
+        '<div class="card"><span class="l">في الدرج قبل حركة اليوم (الفكّة'+(Number(s.opening)>flt?' + أيام لم تُقفل':'')+')</span><b>'+n2(s.opening)+'</b></div>'+
+        '<div class="card"><span class="l">المحصّل نقداً</span><b class="t-ok">'+n2(s.drawer_in)+' <small>'+esc(c)+'</small></b></div>'+
+        '<div class="card"><span class="l">حوالات (تذهب للمصرف، لا للدرج)</span><b>'+n2(trf)+'</b></div>'+
+        '<div class="card"><span class="l">صُرف من الدرج</span><b>'+n2(s.drawer_out)+'</b></div>'+
+        (Number(s.drawer_moves)?'<div class="card"><span class="l">تحويلات من/إلى الدرج</span><b>'+n2(s.drawer_moves)+'</b></div>':'')+
+        '<div class="card big"><span class="l">المتوقع في الدرج الآن</span><b>'+n2(exp)+' <small>'+esc(c)+'</small></b></div>'
+       :'<div class="card"><span class="l">المحصّل من الطلاب (الكل)</span><b class="t-ok">'+n2(s.collected)+' <small>'+esc(c)+'</small></b></div><div class="card"><span class="l">منها حوالات (خارج الدرج)</span><b>'+n2(trf)+'</b></div><div class="card"><span class="l">دفعات المعلمين</span><b>'+n2(s.teachers)+'</b></div><div class="card"><span class="l">مصروفات</span><b>'+n2(s.expenses)+'</b></div><div class="card"><span class="l">سلف</span><b>'+n2(s.advances)+'</b></div><div class="card"><span class="l">رواتب مدفوعة</span><b>'+n2(s.salaries)+'</b></div><div class="card big"><span class="l">المتوقع في الدرج من حركة اليوم</span><b>'+n2(exp)+' <small>'+esc(c)+'</small></b></div>';
+      body.innerHTML='<p class="sub" style="margin-top:0">'+(NEW?'في آخر اليوم عُدّ ما في الدرج وأدخله. ما يُصرف من الخزينة (مثل الإيجار والرواتب) لا يُحسب هنا. عند الإقفال تبقى الفكّة ('+n2(flt)+' '+esc(c)+') في الدرج ويُرحَّل الباقي إلى الخزينة. الإقفال يكون بالترتيب يوماً بعد يوم.':'في آخر اليوم عُدّ ما في الدرج وقارنه بما سجّلته المنظومة. (هذا اليوم قبل بدء الخزينة، فيُحسب بالطريقة القديمة.)')+'</p>'+
         '<div class="filters frm"><label>اليوم<input id="cs-day" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="YYYY-MM-DD" autocomplete="off" dir="ltr" value="'+esc(day)+'"></label></div>'+
-        '<div class="cards"><div class="card"><span class="l">المحصّل من الطلاب (الكل)</span><b class="t-ok">'+n2(coll)+' <small>'+esc(c)+'</small></b></div><div class="card"><span class="l">منها حوالات (خارج الدرج)</span><b>'+n2(trf)+'</b></div><div class="card"><span class="l">دفعات المعلمين</span><b>'+n2(tch)+'</b></div><div class="card"><span class="l">مصروفات</span><b>'+n2(ex)+'</b></div><div class="card"><span class="l">سلف</span><b>'+n2(ad)+'</b></div><div class="card"><span class="l">رواتب مدفوعة</span><b>'+n2(sa)+'</b></div><div class="card big"><span class="l">المتوقع في الدرج من حركة اليوم</span><b>'+n2(exp)+' <small>'+esc(c)+'</small></b></div></div>'+
+        '<div class="cards">'+cards+'</div>'+
         (done?'<div class="sub warn">أُقفل هذا اليوم سابقاً (الفعلي '+n2(done.counted)+'، الفرق '+n2(done.diff)+'). الإقفال من جديد يستبدله.</div>':'')+
         '<div class="filters frm"><label>المبلغ الفعلي في الدرج ('+esc(c)+')<input id="cs-cnt" data-fmt="num" inputmode="decimal" autocomplete="off" dir="ltr" value="'+(done?esc(done.counted):'')+'"></label><label class="grow">ملاحظة (اختياري)<input id="cs-note" maxlength="200" value="'+esc(done?done.note:'')+'"></label><button class="btn sm primary" id="cs-go" type="button">'+(done?'إعادة إقفال اليوم':'إقفال اليوم')+'</button></div><div id="cs-diff" class="sub"></div>'+
-        '<h3 class="sec">آخر الإقفالات</h3><table class="imp"><thead><tr><th>اليوم</th><th>المتوقع</th><th>الفعلي</th><th>الفرق</th><th>ملاحظة</th><th></th></tr></thead><tbody>'+
-        (list.length?list.map(function(x){ var d=Number(x.diff); return '<tr><td dir="ltr">'+esc(x.day)+'</td><td class="n">'+n2(x.expected)+'</td><td class="n">'+n2(x.counted)+'</td><td class="n '+(d<0?'bad':(d>0?'warn':'t-ok'))+'"><b>'+(d===0?'مطابق':(d>0?'زيادة ':'نقص ')+n2(Math.abs(d)))+'</b></td><td>'+esc(x.note)+'</td><td><button class="btn sm cs-rm" data-d="'+esc(x.day)+'" type="button">حذف</button></td></tr>'; }).join(''):'<tr><td colspan="6" class="empty">لا إقفالات بعد.</td></tr>')+'</tbody></table>';
+        '<h3 class="sec">آخر الإقفالات</h3><table class="imp"><thead><tr><th>اليوم</th><th>المتوقع</th><th>الفعلي</th><th>الفرق</th><th>رُحّل للخزينة</th><th>ملاحظة</th><th></th></tr></thead><tbody>'+
+        (list.length?list.map(function(x,k){ var d=Number(x.diff); return '<tr><td dir="ltr">'+esc(x.day)+'</td><td class="n">'+n2(x.expected)+'</td><td class="n">'+n2(x.counted)+'</td><td class="n '+(d<0?'bad':(d>0?'warn':'t-ok'))+'"><b>'+(d===0?'مطابق':(d>0?'زيادة ':'نقص ')+n2(Math.abs(d)))+'</b></td><td class="n">'+(Number(x.to_safe)?n2(x.to_safe):'—')+'</td><td>'+esc(x.note)+'</td><td>'+(k===0?'<button class="btn sm cs-rm" data-d="'+esc(x.day)+'" type="button">حذف</button>':'')+'</td></tr>'; }).join(''):'<tr><td colspan="7" class="empty">لا إقفالات بعد.</td></tr>')+'</tbody></table>';
       var cnt=body.querySelector('#cs-cnt'), df=body.querySelector('#cs-diff');
-      function upd(){ if(cnt.value===''){ df.textContent=''; return; } var d=Number(cnt.value)-exp; df.className='sub '+(d<0?'bad':(d>0?'warn':'ok')); df.textContent=d===0?'مطابق تماماً.':(d>0?'زيادة ':'نقص ')+n2(Math.abs(d))+' '+c; }
+      function upd(){ if(cnt.value===''){ df.textContent=''; return; } var v=Number(cnt.value), d=v-exp; df.className='sub '+(d<0?'bad':(d>0?'warn':'ok'));
+        df.textContent=(d===0?'مطابق تماماً.':(d>0?'زيادة ':'نقص ')+n2(Math.abs(d))+' '+c+'.')+(NEW?(v-flt>=0?' سيُرحَّل إلى الخزينة '+n2(v-flt)+' '+c+' ويبقى في الدرج '+n2(flt)+'.':' المبلغ أقل من الفكّة: سيُكمَل '+n2(flt-v)+' من الخزينة.'):''); }
       cnt.addEventListener('input',upd); upd();
       body.querySelector('#cs-day').onchange=function(){ if(okDate(this.value)){ cashDay=this.value; render(); } else say('اكتب اليوم هكذا: 2026-10-21','bad'); };
       body.querySelector('#cs-go').onclick=async function(){
         if(cnt.value===''){ say('أدخل المبلغ الفعلي في الدرج.','bad'); return; }
         try{ await rpc('cash_close',{p_day:day,p_counted:Number(cnt.value),p_note:body.querySelector('#cs-note').value}); cashMsg='تم إقفال يوم '+day+'.'; cashCls='ok'; msg=cashMsg; msgCls=cashCls; render(); }
         catch(e){ say(adminErr(e),'bad'); } };
-      body.querySelectorAll('.cs-rm').forEach(function(b){ b.onclick=async function(){ if(!confirm('حذف إقفال '+b.dataset.d+'؟')) return; try{ await rpc('cash_unclose',{p_day:b.dataset.d}); msg='حُذف الإقفال.'; msgCls='ok'; render(); }catch(e){ say(adminErr(e),'bad'); } }; });
+      body.querySelectorAll('.cs-rm').forEach(function(b){ b.onclick=async function(){ if(!confirm('حذف إقفال '+b.dataset.d+'؟ يعود ما رُحّل منه إلى الدرج.')) return; try{ await rpc('cash_unclose',{p_day:b.dataset.d}); msg='حُذف الإقفال.'; msgCls='ok'; render(); }catch(e){ say(adminErr(e),'bad'); } }; });
     }).catch(function(e){ body.innerHTML='<div class="bad">'+esc(adminErr(e))+'</div>'; });
+  }
+  /* ===== the treasury: opening balances, balances, count, transfers, movements ===== */
+  var trBox='safe', trMonth=today().slice(0,7), trForm='';
+  function trSetupHtml(t,edit){
+    var cats=DEFAULT_CATS.slice(); D.expenses.forEach(function(x){ if(cats.indexOf(x.category)<0) cats.push(x.category); });
+    var sc=(t&&t.safe_cats)||['إيجار'], c=cur();
+    return '<div class="pwbox"><b>'+(edit?'إعدادات الخزينة':'البداية: أدخل الأرصدة الموجودة الآن')+'</b>'+
+      '<p class="sub">'+(edit?'تغيير تاريخ البدء أو الأرصدة الافتتاحية يغيّر كل الأرصدة المحسوبة. غيّرها فقط لتصحيح خطأ في البداية.':'عُدّ النقود الموجودة واكتبها كما كانت <b>صباح يوم البدء قبل أي دفعة أو مصروف</b>. كل ما سُجّل قبل هذا التاريخ يُعتبر داخلاً فيها ولن يُحسب مرة أخرى. الأفضل أن تجعل البدء يوم غد بعد أن تعدّ الخزينة الليلة.')+'</p>'+
+      '<form id="tr-set" class="filters frm"><label>تاريخ البدء<input id="ts-d" data-fmt="date" inputmode="numeric" maxlength="10" dir="ltr" autocomplete="off" value="'+esc(t&&t.start_date||today())+'"></label>'+
+      '<label>رصيد الخزينة ('+esc(c)+')<input id="ts-safe" data-fmt="num" inputmode="decimal" dir="ltr" autocomplete="off" value="'+(t&&t.started?esc(t.safe_open):'')+'"></label>'+
+      '<label>رصيد المصرف<input id="ts-bank" data-fmt="num" inputmode="decimal" dir="ltr" autocomplete="off" value="'+(t&&t.started?esc(t.bank_open):'0')+'"></label>'+
+      '<label>في الدرج صباح ذلك اليوم<input id="ts-dr" data-fmt="num" inputmode="decimal" dir="ltr" autocomplete="off" value="'+(t&&t.started?esc(t.drawer_open):'')+'"></label>'+
+      '<label>الفكّة الثابتة في الدرج<input id="ts-fl" data-fmt="num" inputmode="decimal" dir="ltr" autocomplete="off" value="'+(t&&t.started?esc(t.float_amt):'')+'" placeholder="مثال: 50"></label></form>'+
+      '<div class="sub" style="margin:6px 0 4px">تصنيفات المصروفات التي تُدفع من الخزينة (الباقي من الدرج):</div><div class="row wrap" id="ts-cats">'+cats.map(function(k){ return '<label class="chk"><input type="checkbox" value="'+esc(k)+'"'+(sc.indexOf(k)>=0?' checked':'')+'> '+esc(k)+'</label>'; }).join('')+'</div>'+
+      '<p class="sub">الرواتب ودفعات المعلمين وسحوبات الشركاء تُحسب من الخزينة، والسلف من الدرج. الحوالات المصرفية من الطلاب تُحسب في المصرف.</p>'+
+      '<div class="row"><button class="btn sm primary" type="button" id="ts-go">'+(edit?'حفظ الإعدادات':'بدء الخزينة')+'</button>'+(edit?'<button class="btn sm" type="button" id="ts-x">إلغاء</button>':'')+'</div></div>';
+  }
+  function trBindSetup(body,t,edit){
+    var g=function(id){ return body.querySelector('#'+id).value.trim(); };
+    if(edit) body.querySelector('#ts-x').onclick=function(){ trForm=''; render(); };
+    body.querySelector('#ts-go').onclick=async function(){
+      var row={id:1,start_date:g('ts-d'),safe_open:Number(g('ts-safe')||0),bank_open:Number(g('ts-bank')||0),drawer_open:Number(g('ts-dr')||0),float_amt:Number(g('ts-fl')||0),
+        safe_cats:[].slice.call(body.querySelectorAll('#ts-cats input:checked')).map(function(x){ return x.value; })};
+      if(!okDate(row.start_date)){ say('اكتب تاريخ البدء هكذا: 2026-10-25','bad'); return; }
+      if(g('ts-safe')===''){ say('اكتب رصيد الخزينة (ولو صفراً).','bad'); return; }
+      if([row.safe_open,row.bank_open,row.drawer_open,row.float_amt].some(function(v){ return isNaN(v); })||row.drawer_open<0||row.float_amt<0){ say('تحقق من المبالغ.','bad'); return; }
+      if(!edit&&!confirm('بدء الخزينة من '+row.start_date+' برصيد '+n2(row.safe_open)+' في الخزينة و'+n2(row.bank_open)+' في المصرف و'+n2(row.drawer_open)+' في الدرج؟')) return;
+      try{ if(edit) await w('PATCH','/rest/v1/treasury_settings?id=eq.1',row); else await w('POST','/rest/v1/treasury_settings',row);
+        trForm=''; if(await load()){ msg=edit?'حُفظت إعدادات الخزينة.':'بدأت الخزينة. من الآن تُحسب الأرصدة تلقائياً.'; msgCls='ok'; render(); } }
+      catch(e){ say(friendly(e).message,'bad'); } };
+  }
+  async function renderTreasury(body){
+    body.innerHTML='جارٍ التحميل…'; var c=cur(), t;
+    try{ t=await rpc('treasury_status',{}); D.trs=t; }catch(e){ body.innerHTML='<div class="bad">'+esc(adminErr(e))+'</div>'; return; }
+    if(!t.started){ body.innerHTML=trSetupHtml(t,false); fmtInputs(body); trBindSetup(body,t,false); return; }
+    var mr=monthRange(trMonth), led=[];
+    try{ led=await rpc('treasury_ledger',{p_box:trBox,p_from:mr[0],p_to:mr[1]})||[]; }catch(e){ say(adminErr(e),'bad'); }
+    var bal=0, rows=led.map(function(x){ var a=Number(x.amount); if(x.kind==='carry'){ bal=a; return '<tr class="sub"><td dir="ltr">'+esc(mr[0])+'</td><td>'+esc(x.label)+'</td><td></td><td></td><td class="n"><b>'+n2(bal)+'</b></td></tr>'; }
+      bal+=a; return '<tr><td dir="ltr">'+esc(x.day)+'</td><td>'+esc(x.label)+'</td><td class="n t-ok">'+(a>0?n2(a):'')+'</td><td class="n bad">'+(a<0?n2(-a):'')+'</td><td class="n">'+n2(bal)+'</td></tr>'; });
+    var forms='';
+    if(trForm==='count') forms='<div class="pwbox"><b>جرد</b><p class="sub">عُدّ النقود الموجودة فعلاً واكتبها. إن اختلفت عن الرصيد المحسوب يُسجَّل الفرق بتاريخ اليوم ويُصحَّح الرصيد.</p><form id="tc-f" class="filters frm"><label>الصندوق<select id="tc-b"><option value="safe">الخزينة</option><option value="bank">المصرف</option></select></label><label>المبلغ الموجود فعلاً ('+esc(c)+')<input id="tc-v" data-fmt="num" inputmode="decimal" dir="ltr" autocomplete="off"></label><label class="grow">ملاحظة<input id="tc-n" maxlength="200"></label><button class="btn sm primary" type="submit">تسجيل الجرد</button><button class="btn sm" type="button" id="tc-x">إلغاء</button></form><div id="tc-d" class="sub"></div></div>';
+    if(trForm==='move') forms='<div class="pwbox"><b>تحويل بين الأرصدة</b><p class="sub">مثال: إيداع نقود من الخزينة في المصرف، أو سحب من المصرف إلى الخزينة.</p><form id="tm-f" class="filters frm"><label>من<select id="tm-a"><option value="safe">الخزينة</option><option value="bank">المصرف</option><option value="drawer">الدرج</option></select></label><label>إلى<select id="tm-b"><option value="bank">المصرف</option><option value="safe">الخزينة</option><option value="drawer">الدرج</option></select></label><label>المبلغ ('+esc(c)+')<input id="tm-v" data-fmt="num" inputmode="decimal" dir="ltr" autocomplete="off"></label><label>التاريخ<input id="tm-d" data-fmt="date" inputmode="numeric" maxlength="10" dir="ltr" autocomplete="off" value="'+esc(today())+'"></label><label class="grow">ملاحظة<input id="tm-n" maxlength="200" placeholder="مثال: إيداع في المصرف"></label><button class="btn sm primary" type="submit">تسجيل التحويل</button><button class="btn sm" type="button" id="tm-x">إلغاء</button></form></div>';
+    body.innerHTML='<div class="cards"><div class="card big"><span class="l">الخزينة</span><b>'+n2(t.safe)+' <small>'+esc(c)+'</small></b></div><div class="card"><span class="l">المصرف</span><b>'+n2(t.bank)+'</b></div><div class="card"><span class="l">الدرج (حسب المنظومة)</span><b>'+n2(t.drawer)+'</b></div><div class="card"><span class="l">المجموع</span><b>'+n2(Number(t.safe)+Number(t.bank)+Number(t.drawer))+'</b></div></div>'+
+      '<p class="sub">بدأت الخزينة يوم '+esc(t.start_date)+' · الفكّة '+n2(t.float_amt)+' · آخر إقفال للدرج: '+esc(t.last_closing||'لا يوجد')+(t.last_count?' · آخر جرد للخزينة: '+esc(t.last_count):'')+'</p>'+
+      '<div class="row wrap" style="margin-bottom:8px"><button class="btn sm primary" type="button" id="tr-count">جرد الخزينة</button><button class="btn sm" type="button" id="tr-move">تحويل بين الأرصدة</button><button class="btn sm" type="button" id="tr-set">إعدادات الخزينة</button></div>'+
+      (trForm==='set'?trSetupHtml(t,true):forms)+
+      '<h3 class="sec">الحركة</h3><div class="filters frm"><label>الصندوق<select id="tr-box"><option value="safe"'+(trBox==='safe'?' selected':'')+'>الخزينة</option><option value="bank"'+(trBox==='bank'?' selected':'')+'>المصرف</option><option value="drawer"'+(trBox==='drawer'?' selected':'')+'>الدرج</option></select></label><label class="mp">الشهر <input data-fmt="month" inputmode="numeric" maxlength="7" dir="ltr" id="tr-m" value="'+esc(trMonth)+'"></label></div>'+
+      '<table class="imp"><thead><tr><th>اليوم</th><th>البيان</th><th>داخل</th><th>خارج</th><th>الرصيد</th></tr></thead><tbody>'+(rows.length>1?rows.join(''):(rows.join('')+'<tr><td colspan="5" class="empty">لا حركة في هذا الشهر.</td></tr>'))+'</tbody></table>';
+    fmtInputs(body);
+    body.querySelector('#tr-count').onclick=function(){ trForm=trForm==='count'?'':'count'; render(); };
+    body.querySelector('#tr-move').onclick=function(){ trForm=trForm==='move'?'':'move'; render(); };
+    body.querySelector('#tr-set').onclick=function(){ trForm=trForm==='set'?'':'set'; render(); };
+    body.querySelector('#tr-box').onchange=function(){ trBox=this.value; render(); };
+    body.querySelector('#tr-m').onchange=function(){ if(/^\d{4}-(0[1-9]|1[0-2])$/.test(this.value)){ trMonth=this.value; render(); } else say('اكتب الشهر هكذا: 2026-10','bad'); };
+    if(trForm==='set') trBindSetup(body,t,true);
+    if(trForm==='count'){
+      var cf=body.querySelector('#tc-f'), cb=cf.querySelector('#tc-b'), cv=cf.querySelector('#tc-v'), cd=body.querySelector('#tc-d');
+      function cupd(){ if(cv.value===''){ cd.textContent=''; return; } var d=Number(cv.value)-Number(t[cb.value]); cd.className='sub '+(d<0?'bad':(d>0?'warn':'ok')); cd.textContent='المحسوب '+n2(t[cb.value])+' — '+(d===0?'مطابق.':(d>0?'زيادة ':'نقص ')+n2(Math.abs(d))+' '+c); }
+      cv.addEventListener('input',cupd); cb.onchange=cupd;
+      body.querySelector('#tc-x').onclick=function(){ trForm=''; render(); };
+      cf.onsubmit=async function(ev){ ev.preventDefault(); if(cv.value===''||!(Number(cv.value)>=0)){ say('اكتب المبلغ الموجود فعلاً.','bad'); return; }
+        var v=Number(cv.value), d=Math.round((v-Number(t[cb.value]))*100)/100;
+        try{ await w('POST','/rest/v1/treasury_moves',{id:uuid(),day:today(),kind:'count',to_box:cb.value,amount:d,counted:v,note:cf.querySelector('#tc-n').value.trim()});
+          trForm=''; msg=d===0?'سُجّل الجرد: مطابق.':'سُجّل الجرد وصُحّح الرصيد ('+(d>0?'زيادة ':'نقص ')+n2(Math.abs(d))+').'; msgCls=d===0?'ok':'warn'; render(); }catch(e){ say(friendly(e).message,'bad'); } };
+    }
+    if(trForm==='move'){
+      var mf=body.querySelector('#tm-f');
+      body.querySelector('#tm-x').onclick=function(){ trForm=''; render(); };
+      mf.onsubmit=async function(ev){ ev.preventDefault(); var a=mf.querySelector('#tm-a').value, b=mf.querySelector('#tm-b').value, v=Number(mf.querySelector('#tm-v').value), d=mf.querySelector('#tm-d').value;
+        if(a===b){ say('اختر صندوقين مختلفين.','bad'); return; } if(!(v>0)){ say('اكتب مبلغاً أكبر من صفر.','bad'); return; } if(!okDate(d)){ say('اكتب التاريخ هكذا: 2026-10-25','bad'); return; }
+        try{ await w('POST','/rest/v1/treasury_moves',{id:uuid(),day:d,kind:'transfer',from_box:a,to_box:b,amount:v,note:mf.querySelector('#tm-n').value.trim()});
+          trForm=''; msg='سُجّل التحويل.'; msgCls='ok'; render(); }catch(e){ say(friendly(e).message,'bad'); } };
+    }
   }
   async function downloadReport(m){
     var c=cur(), rg=monthRange(m), a=rg[0], b=rg[1], T0=monthTotals(m);
@@ -1500,16 +1585,19 @@ function openMoney(){
       '<form id="ex-f" class="filters frm"><label>التاريخ<input data-fmt="date" inputmode="numeric" maxlength="10" placeholder="YYYY-MM-DD" autocomplete="off" dir="ltr" id="ex-date" required value="'+esc(e.on_date)+'"></label><label>المبلغ ('+esc(c)+')<input  data-fmt="num" inputmode="decimal" autocomplete="off" id="ex-amt" required inputmode="decimal" dir="ltr" value="'+esc(e.amount)+'"></label>'+
       '<label>التصنيف<input id="ex-cat" list="ex-cats" required maxlength="40" value="'+esc(e.category)+'" placeholder="اختر أو اكتب"><datalist id="ex-cats">'+cats.map(function(x){return '<option value="'+esc(x)+'">';}).join('')+'</datalist></label>'+
       '<label class="grow">بماذا صُرف هذا المبلغ؟<input id="ex-desc" required maxlength="200" value="'+esc(e.description)+'" placeholder="مثال: إيجار شهر أكتوبر"></label>'+
+      (STAFF?'':'<label>دُفع من<select id="ex-src">'+['drawer','safe','bank'].map(function(k){ return '<option value="'+k+'"'+((e.src||srcFor(e.category))===k?' selected':'')+'>'+BOXN[k]+'</option>'; }).join('')+'</select></label>')+
       '<button class="btn sm primary" type="submit">'+(editExp?'حفظ التعديل':'إضافة مصروف')+'</button>'+(editExp?'<button class="btn sm" type="button" id="ex-x">إلغاء</button>':'')+'</form>'+
       (STAFF?'':'<table class="imp"><thead><tr><th>التاريخ</th><th>التصنيف</th><th>البيان</th><th>سجّله</th><th>المبلغ</th><th></th></tr></thead><tbody>'+
-      (list.length?list.map(function(x){ var mine=!STAFF||(x.created_by&&x.created_by===ME); return '<tr data-id="'+esc(x.id)+'"><td dir="ltr">'+esc(x.on_date)+'</td><td>'+esc(x.category)+'</td><td>'+esc(x.description)+'</td><td class="sub">'+esc(x.created_by_name||'المالك')+'</td><td class="n" dir="ltr">'+n2(x.amount)+'</td><td class="acts">'+(mine?'<button class="btn sm ex-ed" type="button">تعديل</button> <button class="btn sm ex-rm" type="button">حذف</button>':'')+'</td></tr>'; }).join(''):'<tr><td colspan="6" class="empty">لا مصروفات في هذا الشهر.</td></tr>')+
+      (list.length?list.map(function(x){ var mine=!STAFF||(x.created_by&&x.created_by===ME); return '<tr data-id="'+esc(x.id)+'"><td dir="ltr">'+esc(x.on_date)+'</td><td>'+esc(x.category)+(x.src?' <span class="pill '+(x.src==='drawer'?'mute':'info')+'">'+BOXN[x.src]+'</span>':'')+'</td><td>'+esc(x.description)+'</td><td class="sub">'+esc(x.created_by_name||'المالك')+'</td><td class="n" dir="ltr">'+n2(x.amount)+'</td><td class="acts">'+(mine?'<button class="btn sm ex-ed" type="button">تعديل</button> <button class="btn sm ex-rm" type="button">حذف</button>':'')+'</td></tr>'; }).join(''):'<tr><td colspan="6" class="empty">لا مصروفات في هذا الشهر.</td></tr>')+
       '</tbody>'+(list.length?'<tfoot><tr><td colspan="4">إجمالي الشهر</td><td class="n" dir="ltr">'+n2(total)+'</td><td></td></tr></tfoot>':'')+'</table>');
     if(!STAFF) bindMonth(body);
     var f=body.querySelector('#ex-f');
+    if(!STAFF){ var exCat=f.querySelector('#ex-cat'), exSrc=f.querySelector('#ex-src'), srcTouched=!!editExp; exSrc.onchange=function(){ srcTouched=true; }; exCat.addEventListener('input',function(){ if(!srcTouched) exSrc.value=srcFor(exCat.value); }); }
     if(editExp) body.querySelector('#ex-x').onclick=function(){ editExp=null; formId=null; render(); };
     f.onsubmit=async function(ev){
       ev.preventDefault();
       var row={on_date:f.querySelector('#ex-date').value,amount:Number(f.querySelector('#ex-amt').value),category:f.querySelector('#ex-cat').value.trim(),description:f.querySelector('#ex-desc').value.trim()};
+      if(!STAFF) row.src=f.querySelector('#ex-src').value;
       if(!okDate(row.on_date)){ say('اكتب التاريخ هكذا: 2026-10-21','bad'); return; }
       if(!(row.amount>0)||!row.category||!row.description){ say('أكمل كل الخانات بمبلغ أكبر من صفر.','bad'); return; }
       try{
@@ -1644,7 +1732,7 @@ function injectUi(){
   'details.lg{}.dd td{padding:0 8px 6px!important;border:0!important}.dd ul{margin:4px 0;padding-inline-start:22px}.tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}.tabs button{border:1px solid var(--line);background:var(--surface2);color:var(--fg);border-radius:999px;padding:6px 14px;font:600 13px var(--font);cursor:pointer}.tabs button.on{background:var(--primary,var(--fg));color:var(--surface);border-color:transparent}'+
   '.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:10px 0}.cards.sm{margin:8px 0}.noon-modal .card{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface2);display:flex;flex-direction:column;gap:4px}.noon-modal .card .l{font-size:12px;color:var(--muted)}.noon-modal .card b{font-size:18px}.noon-modal .card.big{border-width:2px}.noon-modal .card.emp{margin-bottom:12px;background:var(--surface)}.noon-modal .card.off{opacity:.65}'+
   '.eh{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;justify-content:space-between}.advs{margin:4px 0;padding-inline-start:20px;font-size:13px}.row.wrap{flex-wrap:wrap}.t-ok{color:var(--ok)}'+
-  '.frm label.grow{flex:1;min-width:200px}.frm input,.frm select{width:100%;box-sizing:border-box}.frm label{min-width:130px}.noon-modal h3.sec{margin:18px 0 6px;font-size:15px}.noon-modal .steps{padding-inline-start:20px}.pwbox{border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:10px;background:var(--surface2)}.mp{display:inline-flex;gap:8px;align-items:center;font-weight:600;margin-bottom:8px}td.n{text-align:left}'+
+  '.noon-modal label.chk{display:inline-flex;gap:6px;align-items:center;padding:4px 12px;border:1px solid var(--line);border-radius:999px;font-weight:600;cursor:pointer;background:var(--surface)}.noon-modal label.chk input{width:auto;margin:0}.frm label.grow{flex:1;min-width:200px}.frm input,.frm select{width:100%;box-sizing:border-box}.frm label{min-width:130px}.noon-modal h3.sec{margin:18px 0 6px;font-size:15px}.noon-modal .steps{padding-inline-start:20px}.pwbox{border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:10px;background:var(--surface2)}.mp{display:inline-flex;gap:8px;align-items:center;font-weight:600;margin-bottom:8px}td.n{text-align:left}'+
   '.role-owner #noon-nav-exp,.role-staff #noon-nav-log,.role-staff #noon-nav-money,.role-staff #noon-nav-accounts,.role-staff #noon-nav-trash,.role-staff #noon-nav-wipe,.role-staff .tab-btn[data-tab="backup"],.role-staff #backupState,.role-staff [data-act="del-student"],.role-staff .bn button[data-tab="backup"]{display:none!important}';
   document.head.appendChild(st);
   pill=document.createElement('div'); pill.id='noon-pill'; pill.title='اضغط لتحديث البيانات الآن'; document.body.appendChild(pill); setStatus('init');
