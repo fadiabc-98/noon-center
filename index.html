@@ -348,9 +348,9 @@ function requireLogin(){
 /* ---------- row <-> document mapping ---------- */
 var MAP={
   students:{path:'students',order:'created_at.asc,id.asc',
-    doc:function(r){ return {name:r.name,phone:r.phone,guardian:r.guardian,guardianPhone:r.guardian_phone,notes:r.notes,joined:r.joined||'',status:r.status||'active',grade:r.grade||null,at:Date.parse(r.created_at)||0}; },
+    doc:function(r){ return {name:r.name,phone:r.phone,guardian:r.guardian,guardianPhone:r.guardian_phone,motherPhone:r.mother_phone||'',notes:r.notes,joined:r.joined||'',status:r.status||'active',grade:r.grade||null,at:Date.parse(r.created_at)||0}; },
     row:function(d,full){ var o={}; if(full||'name' in d) o.name=d.name; if(full||'phone' in d) o.phone=d.phone||''; if(full||'guardian' in d) o.guardian=d.guardian||'';
-      if(full||'guardianPhone' in d) o.guardian_phone=d.guardianPhone||''; if(full||'notes' in d) o.notes=d.notes||''; if(full||'joined' in d) o.joined=d.joined||null; if(full||'status' in d) o.status=d.status||'active'; if(full||'grade' in d) o.grade=d.grade?Number(d.grade):null; return o; }},
+      if(full||'guardianPhone' in d) o.guardian_phone=d.guardianPhone||''; if(full||'motherPhone' in d) o.mother_phone=d.motherPhone||''; if(full||'notes' in d) o.notes=d.notes||''; if(full||'joined' in d) o.joined=d.joined||null; if(full||'status' in d) o.status=d.status||'active'; if(full||'grade' in d) o.grade=d.grade?Number(d.grade):null; return o; }},
   subs:{path:'subscriptions',order:'created_at.asc,id.asc',
     doc:function(r){ var o={studentId:r.student_id,course:r.course,start:r.start_date,end:r.end_date,months:r.months,fee:Number(r.fee),at:Date.parse(r.created_at)||0}; if(r.due_on) o.dueOn=r.due_on; if(r.kind==='session') o.kind='session'; if(r.kind==='pack'){ o.kind='pack'; o.sessionsTotal=r.sessions_total; o.sessionsAdjust=r.sessions_adjust||0; } if(Number(r.discount)>0){ o.discount=Number(r.discount); o.discountPct=r.discount_pct==null?null:Number(r.discount_pct); o.discountReason=r.discount_reason||''; o.discountBy=r.discount_by||''; } if(r.teacher_id) o.teacherId=r.teacher_id; if(r.subjects) o.subjects=r.subjects; return o; },
     row:function(d,full){ var o={}; if(full||'studentId' in d) o.student_id=d.studentId; if(full||'course' in d) o.course=d.course; if(full||'start' in d) o.start_date=d.start;
@@ -673,7 +673,7 @@ function openImport(source,label){
 /* ---------- activity log page ---------- */
 var OPS={INSERT:'إضافة',UPDATE:'تعديل',DELETE:'حذف',EXPORT:'تصدير',IMPORT:'استيراد',RESTORE:'استعادة',LOGIN:'دخول',LOGOUT:'خروج',ADMIN:'إجراء إداري'};
 var SECS={students:'الطلاب',subscriptions:'الاشتراكات',payments:'الدفعات',attendance:'الحضور',settings:'الإعدادات',system:'النظام',accounts:'الحسابات',expenses:'المصروفات',employees:'الموظفون',employee_salaries:'رواتب الموظفين',advances:'السلف',salary_payments:'دفع الرواتب',teachers:'المعلمون',teacher_terms:'أجور المعلمين',teacher_payments:'دفعات المعلمين',inquiries:'الاستفسارات',groups:'المجموعات',price_list:'قائمة الأسعار',cash_closings:'إقفال الصندوق',subscription_groups:'مجموعات الباقة',session_marks:'حضور الحصص',group_off:'حصص مؤجلة',teacher_sessions:'حضور المعلمين',partners:'الشركاء',partner_draws:'سحوبات الشركاء',partner_settings:'إعدادات الشركاء',trash:'سلة المحذوفات'};
-var FIELDS={name:'الاسم',phone:'الهاتف',guardian:'ولي الأمر',guardian_phone:'هاتف ولي الأمر',notes:'ملاحظات',joined:'تاريخ الانضمام',course:'الدورة',start_date:'البداية',end_date:'النهاية',months:'الأشهر',fee:'الرسوم',kind:'النوع',amount:'المبلغ',paid_on:'تاريخ الدفع',note:'ملاحظة',mark:'العلامة',day:'اليوم',data:'الإعدادات',student_id:'الطالب',sub_id:'الاشتراك',category:'التصنيف',description:'البيان',on_date:'التاريخ',employee_id:'الموظف',period_start:'بداية الفترة',start_day:'يوم بداية الشهر',active:'يعمل',from_date:'يسري من',email:'البريد',role:'الصلاحية',status:'الحالة',method:'طريقة الدفع',discount:'الخصم',discount_pct:'نسبة الخصم',discount_reason:'سبب الخصم',discount_by:'بواسطة',subjects:'المواد',grade:'الصف',subject:'المادة',slots:'مواعيد الحصص',plan:'الخطة',price:'السعر',teacher_id:'المعلم',pay_type:'نوع الأجر',rate:'القيمة',interest:'الاهتمام',follow_up:'موعد المتابعة',created_by:'سجّله',sessions_total:'عدد الحصص',sessions_adjust:'تعديل الرصيد',group_id:'المجموعة',moved_to:'أُجّلت إلى',moved_t:'وقت التعويض',partner_id:'الشريك',drawn_on:'تاريخ السحب',reserve_pct:'الاحتياطي %'};
+var FIELDS={name:'الاسم',phone:'الهاتف',guardian:'ولي الأمر',guardian_phone:'هاتف الأب',mother_phone:'هاتف الأم',notes:'ملاحظات',joined:'تاريخ الانضمام',course:'الدورة',start_date:'البداية',end_date:'النهاية',months:'الأشهر',fee:'الرسوم',kind:'النوع',amount:'المبلغ',paid_on:'تاريخ الدفع',note:'ملاحظة',mark:'العلامة',day:'اليوم',data:'الإعدادات',student_id:'الطالب',sub_id:'الاشتراك',category:'التصنيف',description:'البيان',on_date:'التاريخ',employee_id:'الموظف',period_start:'بداية الفترة',start_day:'يوم بداية الشهر',active:'يعمل',from_date:'يسري من',email:'البريد',role:'الصلاحية',status:'الحالة',method:'طريقة الدفع',discount:'الخصم',discount_pct:'نسبة الخصم',discount_reason:'سبب الخصم',discount_by:'بواسطة',subjects:'المواد',grade:'الصف',subject:'المادة',slots:'مواعيد الحصص',plan:'الخطة',price:'السعر',teacher_id:'المعلم',pay_type:'نوع الأجر',rate:'القيمة',interest:'الاهتمام',follow_up:'موعد المتابعة',created_by:'سجّله',sessions_total:'عدد الحصص',sessions_adjust:'تعديل الرصيد',group_id:'المجموعة',moved_to:'أُجّلت إلى',moved_t:'وقت التعويض',partner_id:'الشريك',drawn_on:'تاريخ السحب',reserve_pct:'الاحتياطي %'};
 function studentName(id){ var s=cache.students.filter(function(x){return x.id===id;})[0]; return s?s.name:null; }
 function fieldVal(k,v){
   if(v==null||v==='') return '—';
@@ -2558,6 +2558,11 @@ html .stat .st-more b{color:var(--fg)}
 .yr-best td{font-weight:700}
 .yr-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 @media (max-width:800px){.yr-2{grid-template-columns:1fr}.yb-c{min-width:90px}}
+
+/* father / mother picker for WhatsApp */
+.wa-pick{position:fixed;z-index:10050;background:var(--surface,#fff);color:var(--ink,inherit);border:1px solid var(--line,rgba(0,0,0,.12));border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:10px;display:flex;flex-direction:column;gap:6px;min-width:200px;direction:rtl}
+.wa-pick .wp-t{font-size:.85em;opacity:.75;margin-bottom:2px}
+.wa-pick .btn{justify-content:space-between;width:100%}
 </style>
 
 <div id="app" dir="rtl" lang="ar">
@@ -3090,7 +3095,7 @@ function filteredRows(){
   var q=norm(S.q), f=S.filter;
   var list=D.rows.filter(function(r){
     if(q){
-      var hay=norm(r.st.name)+' '+norm(r.st.phone)+' '+norm(r.st.guardian)+' '+norm(r.st.guardianPhone);
+      var hay=norm(r.st.name)+' '+norm(r.st.phone)+' '+norm(r.st.guardian)+' '+norm(r.st.guardianPhone)+' '+norm(r.st.motherPhone||'');
       if(hay.indexOf(q)<0) return false;
     }
     if(S.gradeF&&String(r.st.grade||'')!==S.gradeF) return false;
@@ -3310,7 +3315,8 @@ function openStudentForm(id){
       '<div class="field"><label for="fs-phone">هاتف الطالب</label><input id="fs-phone" class="ltr" inputmode="tel" value="'+esc(st.phone||'')+'"></div>'+
       '<div class="field"><label for="fs-grade">الصف</label><select id="fs-grade"><option value="">— اختر —</option>'+GRADE_NAMES().map(function(n,i){ return '<option value="'+(i+1)+'"'+(st.grade===i+1?' selected':'')+'>'+n+'</option>'; }).join('')+'</select></div>'+
       '<div class="field"><label for="fs-guardian">ولي الأمر</label><input id="fs-guardian" maxlength="120" value="'+esc(st.guardian||'')+'"></div>'+
-      '<div class="field"><label for="fs-gphone">هاتف ولي الأمر</label><input id="fs-gphone" class="ltr" inputmode="tel" value="'+esc(st.guardianPhone||'')+'"></div>'+
+      '<div class="field"><label for="fs-gphone">هاتف الأب</label><input id="fs-gphone" class="ltr" inputmode="tel" value="'+esc(st.guardianPhone||'')+'"></div>'+
+      '<div class="field"><label for="fs-mphone">هاتف الأم</label><input id="fs-mphone" class="ltr" inputmode="tel" value="'+esc(st.motherPhone||'')+'"></div>'+
       '<div class="field wide"><label for="fs-notes">ملاحظات</label><input id="fs-notes" maxlength="300" value="'+esc(st.notes||'')+'"></div>'+
       (r?'<div class="field wide"><label for="fs-status">حالة الطالب</label><select id="fs-status"><option value="active"'+((st.status||'active')==='active'?' selected':'')+'>نشط</option><option value="paused"'+(st.status==='paused'?' selected':'')+'>موقوف مؤقتاً (لا تظهر له تنبيهات)</option><option value="withdrawn"'+(st.status==='withdrawn'?' selected':'')+'>منسحب (تبقى بياناته وسجل دفعاته)</option></select></div>':'')+
     '</div>'+
@@ -3327,7 +3333,7 @@ async function submitStudent(form){
   var id=form.dataset.id, name=$('#fs-name').value.trim().replace(/\s+/g,' ');
   if(!S.db){ err.textContent='التخزين غير متاح، لا يمكن الحفظ.'; return; }
   if(!name){ err.textContent='اكتب اسم الطالب.'; return; }
-  var data={name:name,phone:latinDigits($('#fs-phone').value).trim(),guardian:$('#fs-guardian').value.trim(),guardianPhone:latinDigits($('#fs-gphone').value).trim(),notes:$('#fs-notes').value.trim()};
+  var data={name:name,phone:latinDigits($('#fs-phone').value).trim(),guardian:$('#fs-guardian').value.trim(),guardianPhone:latinDigits($('#fs-gphone').value).trim(),motherPhone:latinDigits(($('#fs-mphone')||{value:''}).value).trim(),notes:$('#fs-notes').value.trim()};
   if(id&&$('#fs-status')) data.status=$('#fs-status').value;
   data.grade=$('#fs-grade').value?Number($('#fs-grade').value):null;
   var sub=null;
@@ -3409,7 +3415,9 @@ function renderDetail(){
   var st=r.st, today=D.today;
   var contacts=[];
   if(st.phone) contacts.push('الطالب: <bdi dir="ltr">'+esc(st.phone)+'</bdi>');
-  if(st.guardian||st.guardianPhone) contacts.push('ولي الأمر: '+esc(st.guardian||'')+(st.guardianPhone?' <bdi dir="ltr">'+esc(st.guardianPhone)+'</bdi>':''));
+  if(st.guardian) contacts.push('ولي الأمر: '+esc(st.guardian));
+  if(st.guardianPhone) contacts.push('الأب: <bdi dir="ltr">'+esc(st.guardianPhone)+'</bdi>');
+  if(st.motherPhone) contacts.push('الأم: <bdi dir="ltr">'+esc(st.motherPhone)+'</bdi>');
   $('#d-head').innerHTML='<h2>'+esc(st.name)+(st.grade?' <small class="muted">— '+esc(GRADE_NAMES()[st.grade-1]||'')+'</small>':'')+'</h2><div class="sub" style="margin-top:4px">'+statusPill(r.status)+(st.status==='paused'?' <span class="pill warn">موقوف مؤقتاً</span>':st.status==='withdrawn'?' <span class="pill crit">منسحب</span>':'')+' '+esc(r.status.course||'')+(r.status.pack&&r.status.sessLeft!=null?' · المتبقي '+r.status.sessLeft+' حصة':r.status.end?' · ينتهي '+fmtDate(r.status.end):'')+'</div>'+
     (contacts.length?'<div class="sub" style="margin-top:6px">'+contacts.join(' · ')+'</div>':'')+
     (st.notes?'<div class="sub" style="margin-top:4px">'+esc(st.notes)+'</div>':'')+
@@ -3472,9 +3480,9 @@ function showPanel(name,subId,kind){
   }
 }
 function updateReminderTarget(r){
-  var phone=r.st.guardianPhone||r.st.phone, wa=$('#rem-wa');
-  $('#rem-to').innerHTML=phone?'سيُرسل إلى: <bdi dir="ltr">'+esc(phone)+'</bdi> '+(r.st.guardianPhone?'(ولي الأمر)':'(الطالب)'):'لا يوجد رقم هاتف مسجّل لهذا الطالب. يمكنك نسخ النص وإرساله يدوياً.';
-  var intl=toIntl(phone);
+  var tg=waTargets(r), wa=$('#rem-wa');
+  $('#rem-to').innerHTML=tg.length?'سيُرسل إلى: '+waWho(tg)+(tg.length>1?' (تختار عند الضغط)':''):'لا يوجد رقم هاتف مسجّل لهذا الطالب. يمكنك نسخ النص وإرساله يدوياً.';
+  var intl=tg.length?tg[0].p:'';
   if(intl){ wa.hidden=false; wa.href='https://wa.me/'+intl+'?text='+encodeURIComponent($('#rem-text').value); }
   else { wa.hidden=true; }
 }
@@ -3581,9 +3589,9 @@ function exportMonth(){
   exportCsv('دفعات-'+ym+'.csv',rows);
 }
 function exportAll(){
-  var rows=[['الاسم','هاتف الطالب','ولي الأمر','هاتف ولي الأمر','تاريخ التسجيل','الدورة','نهاية الاشتراك','الحالة','الرسوم','المدفوع','المتبقي']];
+  var rows=[['الاسم','هاتف الطالب','ولي الأمر','هاتف الأب','هاتف الأم','تاريخ التسجيل','الدورة','نهاية الاشتراك','الحالة','الرسوم','المدفوع','المتبقي']];
   D.rows.slice().sort(function(a,b){return a.st.name.localeCompare(b.st.name,'ar');}).forEach(function(r){
-    rows.push([r.st.name,r.st.phone||'',r.st.guardian||'',r.st.guardianPhone||'',r.st.joined||'',r.status.course||'',r.status.end||'',r.status.label,r.fee,r.paid,r.balance]);
+    rows.push([r.st.name,r.st.phone||'',r.st.guardian||'',r.st.guardianPhone||'',r.st.motherPhone||'',r.st.joined||'',r.status.course||'',r.status.end||'',r.status.label,r.fee,r.paid,r.balance]);
   });
   exportCsv('الطلبة-'+D.today+'.csv',rows);
 }
@@ -3673,7 +3681,7 @@ function validateBackup(o){
     var s=o.students[i];
     if(!s||!ID_RE.test(s.id||'')||!str(s.name,120).trim()||sIds[s.id]) return {error:'سجل طالب غير صالح في الملف (رقم '+(i+1)+').'};
     sIds[s.id]=1;
-    out.students.push({id:s.id,name:str(s.name,120).trim(),phone:str(s.phone,40),guardian:str(s.guardian,120),guardianPhone:str(s.guardianPhone,40),notes:str(s.notes,300),joined:isDate(s.joined)?s.joined:'',at:Number(s.at)||0});
+    out.students.push({id:s.id,name:str(s.name,120).trim(),phone:str(s.phone,40),guardian:str(s.guardian,120),guardianPhone:str(s.guardianPhone,40),motherPhone:str(s.motherPhone,40),notes:str(s.notes,300),joined:isDate(s.joined)?s.joined:'',at:Number(s.at)||0});
   }
   for(i=0;i<o.subs.length;i++){
     var u=o.subs[i], fee=Number(u&&u.fee), mo=parseInt(u&&u.months,10);
@@ -3875,7 +3883,7 @@ function renderAttDay(){
   var base=(q||S.attAll)?D.rows:expectedRows(d);
   var rows=base.filter(function(r){
     if(!q) return true;
-    return (norm(r.st.name)+' '+norm(r.st.phone)+' '+norm(r.st.guardian)+' '+norm(r.st.guardianPhone)).indexOf(q)>=0;
+    return (norm(r.st.name)+' '+norm(r.st.phone)+' '+norm(r.st.guardian)+' '+norm(r.st.guardianPhone)+' '+norm(r.st.motherPhone||'')).indexOf(q)>=0;
   }).sort(function(a,b){ return a.st.name.localeCompare(b.st.name,'ar'); });
 
   var exp=expectedRows(d);
@@ -3991,7 +3999,7 @@ document.addEventListener('keydown',function(e){
   e.preventDefault();
   var d=S.attDate; if(d>todayStr()) return;
   var q=norm(S.attQ); if(!q) return;
-  var hits=D.rows.filter(function(r){ return (norm(r.st.name)+' '+norm(r.st.phone)+' '+norm(r.st.guardian)+' '+norm(r.st.guardianPhone)).indexOf(q)>=0; });
+  var hits=D.rows.filter(function(r){ return (norm(r.st.name)+' '+norm(r.st.phone)+' '+norm(r.st.guardian)+' '+norm(r.st.guardianPhone)+' '+norm(r.st.motherPhone||'')).indexOf(q)>=0; });
   if(hits.length!==1){ toast(hits.length?'اكتب جزءاً أكثر من الاسم ليبقى طالب واحد':'لا توجد نتائج مطابقة'); return; }
   if(markOf(d,hits[0].st.id)!=='p') attMark(hits[0].st.id,'p');
   S.attQ=''; e.target.value=''; renderAttDay(); e.target.focus();
@@ -4547,7 +4555,44 @@ function absentCalc(){
     r.absent=n;
   });
 }
-function waPhone(r){ return toIntl(r.st.guardianPhone||r.st.phone); }
+/* WhatsApp targets: father, mother (or the student when asked first / when no parent number) */
+function waTargets(r,studentFirst){
+  var st=r.st, out=[], seen={};
+  function add(l,raw){ var p=toIntl(raw||''); if(p&&!seen[p]){ seen[p]=1; out.push({l:l,p:p,raw:String(raw).trim()}); } }
+  if(studentFirst&&st.phone){ add('الطالب',st.phone); return out; }
+  add('الأب',st.guardianPhone); add('الأم',st.motherPhone);
+  if(!out.length) add('الطالب',st.phone);
+  return out;
+}
+function waWho(tg){ return tg.map(function(t){ return esc(t.l)+' <bdi dir="ltr">'+esc(t.raw)+'</bdi>'; }).join(' / '); }
+function waPhone(r){ var t=waTargets(r); return t.length?t[0].p:''; }
+function waPickClose(){ var o=document.getElementById('wa-pick'); if(o) o.remove(); }
+function waSend(tg,text,anchor,done){
+  if(!tg.length){ toast('لا يوجد رقم هاتف لهذا الطالب'); return false; }
+  function go(p){ waPickClose(); window.open('https://wa.me/'+p+'?text='+encodeURIComponent(text||''),'_blank','noopener'); if(done) done(); }
+  if(tg.length===1){ go(tg[0].p); return true; }
+  waPickClose();
+  var o=document.createElement('div'); o.id='wa-pick'; o.className='wa-pick'; o.setAttribute('role','dialog');
+  o.innerHTML='<div class="wp-t">إرسال إلى:</div>'+tg.map(function(t,i){ return '<button type="button" class="btn sm wa" data-i="'+i+'"><b>'+esc(t.l)+'</b> <bdi dir="ltr">'+esc(t.raw)+'</bdi></button>'; }).join('')+'<button type="button" class="btn sm" data-x="1">إلغاء</button>';
+  document.body.appendChild(o);
+  var rc=anchor&&anchor.getBoundingClientRect?anchor.getBoundingClientRect():null, w=o.offsetWidth, h=o.offsetHeight, vw=window.innerWidth, vh=window.innerHeight;
+  var top=rc?rc.bottom+6:vh/2-h/2, left=rc?rc.left+rc.width/2-w/2:vw/2-w/2;
+  if(top+h>vh-8) top=rc?Math.max(8,rc.top-h-6):8; left=Math.max(8,Math.min(left,vw-w-8));
+  o.style.top=top+'px'; o.style.left=left+'px';
+  o.addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return; e.stopPropagation(); if(b.dataset.x){ waPickClose(); return; } go(tg[+b.dataset.i].p); });
+  setTimeout(function(){
+    function off(e){ if(!document.getElementById('wa-pick')){ cleanup(); return; } if(e.type==='keydown'&&e.key!=='Escape') return; if(e.type==='mousedown'&&o.contains(e.target)) return; waPickClose(); cleanup(); }
+    function cleanup(){ document.removeEventListener('mousedown',off,true); document.removeEventListener('keydown',off,true); }
+    document.addEventListener('mousedown',off,true); document.addEventListener('keydown',off,true);
+  },0);
+  return 'pick';
+}
+/* the reminder panel link: choose father / mother when both exist */
+document.addEventListener('click',function(e){
+  var a=e.target.closest&&e.target.closest('#rem-wa'); if(!a) return;
+  var r=S.detailId&&D.byId[S.detailId]; if(!r) return; var tg=waTargets(r); if(tg.length<2) return;
+  e.preventDefault(); e.stopPropagation(); var ta=document.getElementById('rem-text'); waSend(tg,ta?ta.value:'',a);
+},true);
 function alertText(r){
   if((S.alertFilter==='absent'&&r.absent>=3)||alertKind(r)==='absent'){
     if(window.thTplAbsent&&S.settings.waAbsent) return window.thTplAbsent(r);
@@ -4557,7 +4602,7 @@ function alertText(r){
   }
   return reminderText(r);
 }
-function openWa(r){ var p=waPhone(r); if(!p){ toast('لا يوجد رقم هاتف لهذا الطالب'); return false; } window.open('https://wa.me/'+p+'?text='+encodeURIComponent(alertText(r)),'_blank','noopener'); return true; }
+function openWa(r,anchor,done){ return waSend(waTargets(r),alertText(r),anchor,done); }
 
 function xModal(title,bodyHtml){
   closeX();
@@ -4572,14 +4617,14 @@ function searchRows(q,max){
   q=norm(q); if(!q) return [];
   var out=[];
   for(var i=0;i<D.rows.length&&out.length<(max||8);i++){
-    var r=D.rows[i], hay=norm(r.st.name)+' '+norm(r.st.phone)+' '+norm(r.st.guardian)+' '+norm(r.st.guardianPhone);
+    var r=D.rows[i], hay=norm(r.st.name)+' '+norm(r.st.phone)+' '+norm(r.st.guardian)+' '+norm(r.st.guardianPhone)+' '+norm(r.st.motherPhone||'');
     if(hay.indexOf(q)>=0) out.push(r);
   }
   return out;
 }
 function resHtml(list,act){
   if(!list.length) return '<div class="empty" style="padding:14px">لا نتائج.</div>';
-  return list.map(function(r){ return '<button type="button" class="gs-item" data-xact="'+act+'" data-id="'+esc(r.st.id)+'"><b>'+esc(r.st.name)+'</b><span class="sub">'+esc(r.status.course||'بدون دورة')+' · '+esc(r.st.phone||r.st.guardianPhone||'')+'</span>'+statusPill(r.status)+'</button>'; }).join('');
+  return list.map(function(r){ return '<button type="button" class="gs-item" data-xact="'+act+'" data-id="'+esc(r.st.id)+'"><b>'+esc(r.st.name)+'</b><span class="sub">'+esc(r.status.course||'بدون دورة')+' · '+esc(r.st.phone||r.st.guardianPhone||r.st.motherPhone||'')+'</span>'+statusPill(r.status)+'</button>'; }).join('');
 }
 function bindGlobalSearch(){
   var q=document.getElementById('gs-q'), box=document.getElementById('gs-res'); if(!q) return;
@@ -4661,11 +4706,11 @@ async function sendReceiptWa(){
     if(f&&navigator.canShare&&navigator.share&&navigator.canShare({files:[f]})){ await navigator.share({files:[f],text:(S.settings.waReceipt||'')}); return; }
   }catch(e){ if(e&&e.name==='AbortError') return; }
   // computer: copy the image, open the guardian's chat, the user pastes it
-  var p=waPhone(r), copied=false;
+  var tg=waTargets(r), copied=false;
   try{ if(blob&&navigator.clipboard&&window.ClipboardItem){ await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); copied=true; } }catch(e){}
-  if(!p){ toast(copied?'نُسخت صورة الإيصال. لا يوجد رقم هاتف للطالب، افتح المحادثة والصق الصورة':'لا يوجد رقم هاتف لهذا الطالب'); return; }
+  if(!tg.length){ toast(copied?'نُسخت صورة الإيصال. لا يوجد رقم هاتف للطالب، افتح المحادثة والصق الصورة':'لا يوجد رقم هاتف لهذا الطالب'); return; }
   toast(copied?'نُسخت صورة الإيصال، الصقها في المحادثة (Ctrl+V)':'تعذر نسخ الصورة، استخدم زر تنزيل PDF');
-  window.open('https://wa.me/'+p+'?text='+encodeURIComponent(S.settings.waReceipt||''),'_blank','noopener');
+  waSend(tg,S.settings.waReceipt||'',document.getElementById('rcpt-wa'));
 }
 (function(){ var row=document.querySelector('#rcpt .row:last-of-type'); if(row&&!document.getElementById('rcpt-wa')){ var b=document.createElement('button'); b.type='button'; b.className='btn wa'; b.id='rcpt-wa'; b.dataset.xact='rcpt-wa'; b.textContent='مشاركة الصورة على واتساب'; row.insertBefore(b,row.firstChild); } })();
 document.addEventListener('click',function(e){
@@ -4679,8 +4724,8 @@ document.addEventListener('click',function(e){
   else if(a==='qp-pick'){ closeX(); openDetail(id,{panel:'pay'}); }
   else if(a==='quickpay') quickPay();
   else if(a==='bulk') bulkReminders();
-  else if(a==='wa'){ var r=D.byId[id]; if(r) openWa(r); }
-  else if(a==='bulk-wa'){ var r2=D.byId[id]; if(r2&&openWa(r2)){ var row=el.closest('.bulk-row'); if(row){ row.classList.add('done'); el.textContent='تم ✓'; el.classList.remove('primary'); el.disabled=true; } } }
+  else if(a==='wa'){ var r=D.byId[id]; if(r) openWa(r,el); }
+  else if(a==='bulk-wa'){ var r2=D.byId[id]; if(r2) openWa(r2,el,function(){ var row=el.closest('.bulk-row'); if(row){ row.classList.add('done'); el.textContent='تم ✓'; el.classList.remove('primary'); el.disabled=true; } }); }
   else if(a==='more-go'){ var o=document.getElementById('x-modal'), item=o&&o.__rows&&o.__rows[+el.dataset.i]; closeX(); if(item) item.el.click(); }
   else if(a==='more-out'){ closeX(); var lo=document.getElementById('noon-logout'); if(lo) lo.click(); }
 });
@@ -5553,14 +5598,15 @@ function ppWaText(g,o){
     'نعتذر عن أي إزعاج، وشكراً لتفهمكم.'];
   return L.join('\n');
 }
-function ppWaPhone(r){ return toIntl(r.st.phone||r.st.guardianPhone); }
+function ppWaPhone(r){ var t=waTargets(r,true); return t.length?t[0].p:''; }
+function parentsTxt(st){ return [st.guardianPhone,st.motherPhone].filter(function(x){ return x&&String(x).trim(); }).join(' / '); }
 function openPpWa(gid){
   var g=(window.NOON_GROUPS||[]).filter(function(x){ return x.id===gid; })[0]; if(!g) return;
   var o=(window.NOON_OFF||[]).filter(function(x){ return x.group_id===gid&&x.day===TD.day; })[0]; if(!o) return;
   var ros=rosterFor(g,TD.day), text=ppWaText(g,o);
   var rows=ros.map(function(r,i){
-    var ph=ppWaPhone(r), who=r.st.phone?'هاتف الطالب':(r.st.guardianPhone?'هاتف ولي الأمر':'');
-    return '<div class="bulk-row" id="ppw-'+i+'"><div><b>'+esc(r.st.name)+'</b><div class="sub">'+(ph?esc(who)+' · <span dir="ltr">'+esc(r.st.phone||r.st.guardianPhone)+'</span>':'<span class="bad">لا يوجد رقم هاتف</span>')+'</div></div>'+
+    var ph=ppWaPhone(r);
+    return '<div class="bulk-row" id="ppw-'+i+'"><div><b>'+esc(r.st.name)+'</b><div class="sub">'+(ph?waWho(waTargets(r,true)):'<span class="bad">لا يوجد رقم هاتف</span>')+'</div></div>'+
       (ph?'<button class="btn sm wa" type="button" data-xact="ppw-go" data-i="'+i+'">إرسال</button>':'')+'</div>';
   }).join('');
   var m=xModal('إبلاغ طلاب المجموعة بالتأجيل',
@@ -5573,9 +5619,8 @@ document.addEventListener('click',function(e){
   var el=e.target.closest&&e.target.closest('[data-xact="td-wa"],[data-xact="ppw-go"]'); if(!el) return;
   if(el.dataset.xact==='td-wa'){ openPpWa(el.dataset.g); return; }
   var m=document.getElementById('x-modal'), d=m&&m.__ppw; if(!d) return;
-  var r=d.ros[+el.dataset.i], ph=r&&ppWaPhone(r); if(!ph) return;
-  window.open('https://wa.me/'+ph+'?text='+encodeURIComponent(d.text),'_blank','noopener');
-  var row=document.getElementById('ppw-'+el.dataset.i); if(row) row.classList.add('done'); el.textContent='أُرسلت ✓';
+  var r=d.ros[+el.dataset.i]; if(!r) return;
+  waSend(waTargets(r,true),d.text,el,function(){ var row=document.getElementById('ppw-'+el.dataset.i); if(row) row.classList.add('done'); el.textContent='أُرسلت ✓'; });
 });
 (function(){
   var _rt=renderToday; renderToday=function(){ _rt.apply(this,arguments);
@@ -5645,13 +5690,13 @@ function sheetTeacher(tid){
     var ros=rosterFor(g,today); ros.forEach(function(r){ seen[r.st.id]=1; }); n+=ros.length;
     body+='<h2>'+esc(grpName(g.id))+' <span class="small">('+ros.length+' طالب · '+(g.slots||[]).map(function(s){ return DAYN[s.d]+' '+s.t; }).join('، ')+')</span></h2>'+
       (ros.length?'<table><thead><tr><th>#</th><th>الطالب</th><th>الهاتف</th><th>ولي الأمر</th><th>الحالة</th><th class="n">المتبقي</th></tr></thead><tbody>'+ros.map(function(r,i){
-        return '<tr><td class="n">'+(i+1)+'</td><td>'+esc(r.st.name)+'</td><td dir="ltr">'+esc(r.st.phone||'')+'</td><td dir="ltr">'+esc(r.st.guardianPhone||'')+'</td><td>'+esc(r.status.label||'')+'</td><td class="n'+(r.balance>0?' bad':'')+'">'+(r.balance>0?esc(money(r.balance)):'—')+'</td></tr>'; }).join('')+'</tbody></table>':'<p class="small">لا طلاب مرتبطون.</p>');
+        return '<tr><td class="n">'+(i+1)+'</td><td>'+esc(r.st.name)+'</td><td dir="ltr">'+esc(r.st.phone||'')+'</td><td dir="ltr">'+esc(parentsTxt(r.st))+'</td><td>'+esc(r.status.label||'')+'</td><td class="n'+(r.balance>0?' bad':'')+'">'+(r.balance>0?esc(money(r.balance)):'—')+'</td></tr>'; }).join('')+'</tbody></table>':'<p class="small">لا طلاب مرتبطون.</p>');
   });
   var mo=D.rows.filter(function(r){ return !seen[r.st.id]&&r.subs.some(function(s){ return s.teacherId===tid&&s.end>=today; }); });
   if(mo.length){ n+=mo.length;
     body+='<h2>طلاب اشتراكات مرتبطة بالمعلم <span class="small">('+mo.length+')</span></h2><table><thead><tr><th>#</th><th>الطالب</th><th>الهاتف</th><th>الدورة</th><th>ينتهي</th><th class="n">المتبقي</th></tr></thead><tbody>'+mo.map(function(r,i){
       var s=r.subs.filter(function(x){ return x.teacherId===tid&&x.end>=today; })[0];
-      return '<tr><td class="n">'+(i+1)+'</td><td>'+esc(r.st.name)+'</td><td dir="ltr">'+esc(r.st.phone||r.st.guardianPhone||'')+'</td><td>'+esc(s.course||'')+'</td><td class="n">'+esc(fmtDate(s.end))+'</td><td class="n'+(r.balance>0?' bad':'')+'">'+(r.balance>0?esc(money(r.balance)):'—')+'</td></tr>'; }).join('')+'</tbody></table>';
+      return '<tr><td class="n">'+(i+1)+'</td><td>'+esc(r.st.name)+'</td><td dir="ltr">'+esc(r.st.phone||r.st.guardianPhone||r.st.motherPhone||'')+'</td><td>'+esc(s.course||'')+'</td><td class="n">'+esc(fmtDate(s.end))+'</td><td class="n'+(r.balance>0?' bad':'')+'">'+(r.balance>0?esc(money(r.balance)):'—')+'</td></tr>'; }).join('')+'</tbody></table>';
   }
   printSheet('كشف طلاب المعلم: '+t.name,(body||'<p>لا مجموعات أو طلاب مرتبطون بهذا المعلم.</p>')+'<div class="foot">المجموع: '+n+' طالب.</div>');
 }
@@ -5659,7 +5704,7 @@ function sheetOverdue(){
   var cur=(S.settings||{}).currency||'', list=D.rows.filter(function(r){ return r.balance>0; }).sort(function(a,b){ return b.balance-a.balance; });
   var tot=0, rows=list.map(function(r,i){
     var fee=0, paid=0; r.subs.forEach(function(s){ if(s.remaining>0){ fee+=Number(s.fee)||0; paid+=Number(s.paid)||0; } }); tot+=r.balance;
-    return '<tr><td class="n">'+(i+1)+'</td><td>'+esc(r.st.name)+'</td><td dir="ltr">'+esc(r.st.phone||'')+'</td><td dir="ltr">'+esc(r.st.guardianPhone||'')+'</td><td>'+esc(r.status.course||'')+'</td><td class="n">'+(r.status.end?esc(fmtDate(r.status.end)):'—')+'</td><td class="n">'+(function(){ var d=(typeof rowDue==='function')?rowDue(r):null; return d&&(d.passed||d.next)?esc(fmtDate(d.passed||d.next)):'—'; })()+'</td><td class="n">'+esc(money(r3(fee)))+'</td><td class="n">'+esc(money(r3(paid)))+'</td><td class="n bad">'+esc(money(r.balance))+'</td></tr>';
+    return '<tr><td class="n">'+(i+1)+'</td><td>'+esc(r.st.name)+'</td><td dir="ltr">'+esc(r.st.phone||'')+'</td><td dir="ltr">'+esc(parentsTxt(r.st))+'</td><td>'+esc(r.status.course||'')+'</td><td class="n">'+(r.status.end?esc(fmtDate(r.status.end)):'—')+'</td><td class="n">'+(function(){ var d=(typeof rowDue==='function')?rowDue(r):null; return d&&(d.passed||d.next)?esc(fmtDate(d.passed||d.next)):'—'; })()+'</td><td class="n">'+esc(money(r3(fee)))+'</td><td class="n">'+esc(money(r3(paid)))+'</td><td class="n bad">'+esc(money(r.balance))+'</td></tr>';
   }).join('');
   printSheet('كشف المتأخرين في الدفع',list.length?'<table><thead><tr><th>#</th><th>الطالب</th><th>هاتف الطالب</th><th>هاتف ولي الأمر</th><th>الدورة</th><th class="n">نهاية الاشتراك</th><th class="n">موعد السداد</th><th class="n">الرسوم</th><th class="n">المدفوع</th><th class="n">المتبقي</th></tr></thead><tbody>'+rows+
     '<tr class="tot"><td colspan="9">الإجمالي ('+list.length+' طالب)</td><td class="n">'+esc(money(r3(tot)))+' '+esc(cur)+'</td></tr></tbody></table>':'<p>لا يوجد طلاب عليهم مبالغ متبقية.</p>',true);
@@ -5748,8 +5793,10 @@ function decoAlertsDue(){
 }
 
 /* ---- 4) siblings: students who share the guardian's phone number ---- */
-function famKey(st){ return toIntl((st&&st.guardianPhone)||''); }
-function siblingsOf(r){ var k=famKey(r.st); if(!k) return []; return D.rows.filter(function(x){ return x!==r&&x.st.status!=='withdrawn'&&famKey(x.st)===k; }); }
+function famKeys(st){ return [toIntl((st&&st.guardianPhone)||''),toIntl((st&&st.motherPhone)||'')].filter(Boolean); }
+function famKey(st){ return famKeys(st)[0]||''; }
+function famShare(ks,st){ var o=famKeys(st); return ks.some(function(k){ return o.indexOf(k)>=0; }); }
+function siblingsOf(r){ var ks=famKeys(r.st); if(!ks.length) return []; return D.rows.filter(function(x){ return x!==r&&x.st.status!=='withdrawn'&&famShare(ks,x.st); }); }
 function famText(rows){
   var st=S.settings, tot=0, L=['السلام عليكم ورحمة الله وبركاته،','نفيدكم من إدارة '+st.centerName+' بخصوص أبنائكم في المركز:'];
   rows.forEach(function(r){ var s=r.status, parts=[r.st.name+': '+(s.course||'بدون اشتراك')];
@@ -5778,19 +5825,19 @@ document.addEventListener('click',function(e){
     if(dr){ dr.value='خصم إخوة'; dr.dispatchEvent(new Event('input',{bubbles:true})); }
     toast('طُبّق خصم الإخوة '+pct+'%'); return; }
   var r=S.detailId&&D.byId[S.detailId]; if(!r) return;
-  var ph=toIntl(r.st.guardianPhone||''); if(!ph){ toast('لا يوجد رقم ولي أمر'); return; }
+  var tg=waTargets(r).filter(function(t){ return t.l!=='الطالب'; }); if(!tg.length){ toast('لا يوجد رقم ولي أمر'); return; }
   var rows=[r].concat(siblingsOf(r)).sort(function(a,b){ return a.st.name.localeCompare(b.st.name,'ar'); });
-  window.open('https://wa.me/'+ph+'?text='+encodeURIComponent(famText(rows)),'_blank','noopener');
+  waSend(tg,famText(rows),el);
 });
 /* sibling discount button next to the discount field of a subscription form */
 function sibHint(){
   var pct=Number(S.settings&&S.settings.siblingPct)||0;
   document.querySelectorAll('#overlay [data-f="dtype"]').forEach(function(dt){
     var box=dt.closest('.subfields')||dt.closest('form'); if(!box) return;
-    var gp=document.getElementById('fs-gphone'), key='', self=null;
-    if(gp&&box.closest('form')&&box.closest('form').contains(gp)) key=toIntl(gp.value||'');
-    else if(S.detailId&&D.byId[S.detailId]){ self=D.byId[S.detailId]; key=famKey(self.st); }
-    var n=key?D.rows.filter(function(x){ return x!==self&&x.st.status!=='withdrawn'&&famKey(x.st)===key; }).length:0;
+    var gp=document.getElementById('fs-gphone'), mp=document.getElementById('fs-mphone'), ks=[], self=null;
+    if(gp&&box.closest('form')&&box.closest('form').contains(gp)) ks=famKeys({guardianPhone:gp.value,motherPhone:mp?mp.value:''});
+    else if(S.detailId&&D.byId[S.detailId]){ self=D.byId[S.detailId]; ks=famKeys(self.st); }
+    var n=ks.length?D.rows.filter(function(x){ return x!==self&&x.st.status!=='withdrawn'&&famShare(ks,x.st); }).length:0;
     var old=box.querySelector('.th-sib');
     if(!(pct>0&&n>0)){ if(old) old.remove(); return; }
     var txt='تطبيق خصم الإخوة '+pct+'% (له '+(n===1?'أخ مسجّل':n+' إخوة مسجّلين')+')';
@@ -5799,7 +5846,7 @@ function sibHint(){
     var f=dt.closest('.field'); (f||dt).insertAdjacentElement('afterend',b);
   });
 }
-document.addEventListener('input',function(e){ if(e.target&&e.target.id==='fs-gphone') sibHint(); });
+document.addEventListener('input',function(e){ if(e.target&&(e.target.id==='fs-gphone'||e.target.id==='fs-mphone')) sibHint(); });
 (function(){ var ov=document.getElementById('overlay'); if(ov&&window.MutationObserver) new MutationObserver(function(){ if(!ov.hidden) setTimeout(sibHint,0); }).observe(ov,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden']}); })();
 
 (function(){
@@ -5864,7 +5911,7 @@ function holText(day,reason){
 function openHolWa(){
   var day=TD.day, hol=holOffs(day), reason=hol.length?String(hol[0].note).replace(/^عطلة:?\s*/,''):'', list=holStudents(day), text=holText(day,reason);
   var rows=list.map(function(x,i){ var r=x.r, ph=ppWaPhone(r);
-    return '<div class="bulk-row" id="hw-'+i+'"><div><b>'+esc(r.st.name)+'</b><div class="sub">'+esc(x.g)+' · '+(ph?'<span dir="ltr">'+esc(r.st.phone||r.st.guardianPhone)+'</span>':'<span class="bad">لا يوجد رقم</span>')+'</div></div>'+(ph?'<button class="btn sm wa" type="button" data-xact="hw-go" data-i="'+i+'">إرسال</button>':'')+'</div>'; }).join('');
+    return '<div class="bulk-row" id="hw-'+i+'"><div><b>'+esc(r.st.name)+'</b><div class="sub">'+esc(x.g)+' · '+(ph?waWho(waTargets(r,true)):'<span class="bad">لا يوجد رقم</span>')+'</div></div>'+(ph?'<button class="btn sm wa" type="button" data-xact="hw-go" data-i="'+i+'">إرسال</button>':'')+'</div>'; }).join('');
   var m=xModal('إبلاغ الطلاب بالعطلة','<p class="sub" style="margin-top:0">'+list.length+' طالب لديهم حصص أو حضور في هذا اليوم. اضغط «إرسال» أمام كل طالب (رقم الطالب، وإن لم يوجد فرقم ولي الأمر).</p><details class="ppw-msg"><summary>نص الرسالة</summary><pre>'+esc(text)+'</pre></details>'+(rows?'<div class="bulk-list">'+rows+'</div>':'<div class="empty">لا يوجد طلاب.</div>'));
   m.__hw={list:list,text:text};
 }
@@ -5897,9 +5944,8 @@ document.addEventListener('click',async function(e){
   if(a==='hol-cancel'){ if(!confirm('إلغاء العطلة وإرجاع حصص هذا اليوم؟')) return; if(await holSet(false)) toast('أُلغيت العطلة'); return; }
   if(a==='hol-wa'){ openHolWa(); return; }
   var m=document.getElementById('x-modal'), d=m&&m.__hw; if(!d) return;
-  var x=d.list[+el.dataset.i], ph=x&&ppWaPhone(x.r); if(!ph) return;
-  window.open('https://wa.me/'+ph+'?text='+encodeURIComponent(d.text),'_blank','noopener');
-  var row=document.getElementById('hw-'+el.dataset.i); if(row) row.classList.add('done'); el.textContent='أُرسلت ✓';
+  var x=d.list[+el.dataset.i]; if(!x) return;
+  waSend(waTargets(x.r,true),d.text,el,function(){ var row=document.getElementById('hw-'+el.dataset.i); if(row) row.classList.add('done'); el.textContent='أُرسلت ✓'; });
 });
 (function(){
   var _rt2=renderToday; renderToday=function(){ _rt2.apply(this,arguments); try{
