@@ -788,16 +788,27 @@ function prevPeriod(sd,p){ var d=new Date(Date.UTC(+p.start.slice(0,4),+p.start.
 /* cache.payments holds raw rows: student_id, paid_on, amount, note, created_at */
 function pays(){ return (cache.payments||[]).map(function(p){ return {studentId:p.student_id,date:p.paid_on,amount:Number(p.amount)||0,note:p.note,method:p.method||'cash',at:Date.parse(p.created_at)||0}; }); }
 function salaryAt(list,empId,date){ var best=null; list.forEach(function(s){ if(s.employee_id===empId&&s.from_date<=date&&(!best||s.from_date>best.from_date)) best=s; }); return best; }
+function dmy(v){ var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(v||'')); return m?m[3]+'/'+m[2]+'/'+m[1]:String(v||''); }
+var NATV=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');
+function dmyInput(el){
+  if(!el||el.dataset.dmy) return; el.dataset.dmy='1';
+  function iso(v){ var m=/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(v).trim()); return m?m[3]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[1]).slice(-2):v; }
+  Object.defineProperty(el,'value',{configurable:true,get:function(){ return iso(NATV.get.call(el)); },set:function(v){ NATV.set.call(el,dmy(v)||String(v==null?'':v)); }});
+  NATV.set.call(el,dmy(NATV.get.call(el))); el.placeholder='DD/MM/YYYY'; el.maxLength=10;
+}
+if(window.MutationObserver) new MutationObserver(function(ms){ ms.forEach(function(m){ [].forEach.call(m.addedNodes,function(n){ if(n.nodeType!==1) return; if(n.matches&&n.matches('input[data-fmt="date"]')) dmyInput(n); if(n.querySelectorAll) [].forEach.call(n.querySelectorAll('input[data-fmt="date"]'),dmyInput); }); }); }).observe(document.documentElement,{childList:true,subtree:true});
 function fmtInputs(root){
   var AR='٠١٢٣٤٥٦٧٨٩', FA='۰۱۲۳۴۵۶۷۸۹';
   function latin(v){ return String(v).replace(/[٠-٩]/g,function(c){return AR.indexOf(c);}).replace(/[۰-۹]/g,function(c){return FA.indexOf(c);}).replace(/[٫،,]/g,'.').replace(/[٬]/g,''); }
   root.addEventListener('input',function(e){
-    var el=e.target; if(!el||!el.dataset||!el.dataset.fmt) return; var f=el.dataset.fmt, v=latin(el.value);
+    var el=e.target; if(!el||!el.dataset||!el.dataset.fmt) return; var f=el.dataset.fmt, DM=!!el.dataset.dmy, cur0=DM?NATV.get.call(el):el.value, v=latin(cur0);
     if(f==='num'){ v=v.replace(/[^0-9.]/g,''); var i=v.indexOf('.'); if(i>=0) v=v.slice(0,i+1)+v.slice(i+1).replace(/\./g,''); }
-    else { var d=v.replace(/\D/g,''); if(f==='date'){ d=d.slice(0,8); v=d.length>6?d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6):(d.length>4?d.slice(0,4)+'-'+d.slice(4):d); }
+    else { var d=v.replace(/\D/g,''); if(f==='date'&&DM&&/^\d{4}[-\/.]\d{1,2}[-\/.]\d{1,2}$/.test(v.trim())){ var q=v.trim().split(/[-\/.]/); v=('0'+q[2]).slice(-2)+'/'+('0'+q[1]).slice(-2)+'/'+q[0]; }
+           else if(f==='date'&&DM){ d=d.slice(0,8); v=d.length>4?d.slice(0,2)+'/'+d.slice(2,4)+'/'+d.slice(4):(d.length>2?d.slice(0,2)+'/'+d.slice(2):d); }
+           else if(f==='date'){ d=d.slice(0,8); v=d.length>6?d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6):(d.length>4?d.slice(0,4)+'-'+d.slice(4):d); }
            else if(f==='time'){ d=d.slice(0,4); v=d.length>2?d.slice(0,2)+':'+d.slice(2):d; }
            else { d=d.slice(0,6); v=d.length>4?d.slice(0,4)+'-'+d.slice(4):d; } }
-    if(v!==el.value) el.value=v;
+    if(v!==cur0){ if(DM) NATV.set.call(el,v); else el.value=v; }
   });
 }
 function okDate(v){ return /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(v||'')&&!isNaN(Date.parse(v+'T00:00:00Z')); }
@@ -1011,7 +1022,7 @@ function openInquiries(){
   function render(){
     var t=today(), list=rows.filter(function(x){ return filt==='all'||(filt==='open'?(x.status==='new'||x.status==='contacted'):x.status===filt); });
     var due=rows.filter(function(x){ return (x.status==='new'||x.status==='contacted')&&x.follow_up&&x.follow_up<=t; }).length;
-    bd.innerHTML='<form id="iq-f" class="filters frm"><label>الاسم<input name="name" required maxlength="80"></label><label>الهاتف<input name="ph" dir="ltr" inputmode="tel" maxlength="30"></label><label>مهتم بـ<input name="int" maxlength="120" list="courses-list"></label><label>موعد المتابعة<input name="fu" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="YYYY-MM-DD" autocomplete="off" dir="ltr"></label><label class="grow">ملاحظة<input name="note" maxlength="300"></label><button class="btn sm primary" type="submit">إضافة</button></form>'+
+    bd.innerHTML='<form id="iq-f" class="filters frm"><label>الاسم<input name="name" required maxlength="80"></label><label>الهاتف<input name="ph" dir="ltr" inputmode="tel" maxlength="30"></label><label>مهتم بـ<input name="int" maxlength="120" list="courses-list"></label><label>موعد المتابعة<input name="fu" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off" dir="ltr"></label><label class="grow">ملاحظة<input name="note" maxlength="300"></label><button class="btn sm primary" type="submit">إضافة</button></form>'+
       '<div class="sub '+(msg?'ok':'')+'" id="iq-msg">'+esc(msg)+'</div>'+
       '<div class="tabs">'+[['open','قيد المتابعة'],['enrolled','سجّلوا'],['lost','لم يسجّلوا'],['all','الكل']].map(function(k){ return '<button type="button" data-f="'+k[0]+'"'+(filt===k[0]?' class="on"':'')+'>'+k[1]+'</button>'; }).join('')+'</div>'+
       (due?'<div class="sub warn">'+due+' استفسار موعد متابعته اليوم أو فات.</div>':'')+
@@ -1023,7 +1034,7 @@ function openInquiries(){
     fmtInputs(bd);
     bd.querySelectorAll('.tabs button').forEach(function(b){ b.onclick=function(){ filt=b.dataset.f; msg=''; render(); }; });
     var f=bd.querySelector('#iq-f'), sid=uuid();
-    f.onsubmit=async function(ev){ ev.preventDefault(); var fu=f.fu.value.trim(); if(fu&&!okDate(fu)){ bd.querySelector('#iq-msg').textContent='اكتب موعد المتابعة هكذا: 2026-10-21'; return; }
+    f.onsubmit=async function(ev){ ev.preventDefault(); var fu=f.fu.value.trim(); if(fu&&!okDate(fu)){ bd.querySelector('#iq-msg').textContent='اكتب موعد المتابعة هكذا: 21/10/2026'; return; }
       var btn=f.querySelector('.primary'); btn.disabled=true;
       try{ try{ await w('POST','/rest/v1/inquiries',{id:sid,name:f.name.value.trim(),phone:f.ph.value.trim(),interest:f['int'].value.trim(),note:f.note.value.trim(),follow_up:fu||null}); }catch(er){ if(er.code!=='23505') throw er; }
         if(await load()){ msg='تمت إضافة الاستفسار.'; render(); } }catch(e){ bd.querySelector('#iq-msg').textContent=friendly(e).message; btn.disabled=false; } };
@@ -1170,7 +1181,7 @@ function openMoney(){
     var keys=Object.keys(days).sort().reverse(), tIn=0, tOut=0, cnt=0;
     var rows=keys.map(function(k){ var x=days[k], inn=sum(x.pays,function(p){return p.amount;}); tIn+=inn; tOut+=x.out; cnt+=x.pays.length; var net=inn-x.out;
       var det=x.pays.slice().sort(function(a,b){return (a.at||0)-(b.at||0);}).map(function(p){ return '<li>'+esc(studentName(p.studentId)||'(طالب محذوف)')+' — <b>'+n2(p.amount)+'</b>'+(p.method==='transfer'?' <small>(حوالة)</small>':'')+(p.note?' <small>('+esc(p.note)+')</small>':'')+'</li>'; }).join('');
-      return '<tr class="dy"><td dir="ltr">'+esc(k)+'</td><td class="n">'+x.pays.length+'</td><td class="n t-ok">'+n2(inn)+'</td><td class="n">'+n2(x.out)+'</td><td class="n '+(net<0?'bad':'')+'">'+n2(net)+'</td></tr>'+(det?'<tr class="dd"><td colspan="5"><details><summary>تفاصيل الدفعات</summary><ul>'+det+'</ul></details></td></tr>':''); }).join('');
+      return '<tr class="dy"><td dir="ltr">'+esc(dmy(k))+'</td><td class="n">'+x.pays.length+'</td><td class="n t-ok">'+n2(inn)+'</td><td class="n">'+n2(x.out)+'</td><td class="n '+(net<0?'bad':'')+'">'+n2(net)+'</td></tr>'+(det?'<tr class="dd"><td colspan="5"><details><summary>تفاصيل الدفعات</summary><ul>'+det+'</ul></details></td></tr>':''); }).join('');
     var t=today(), todayIn=sum(days[t]?days[t].pays:[],function(p){return p.amount;});
     body.innerHTML=monthPicker()+'<div class="cards"><div class="card"><span class="l">دخل اليوم ('+esc(t)+')</span><b class="t-ok">'+n2(todayIn)+' <small>'+esc(c)+'</small></b></div>'+
       '<div class="card"><span class="l">إجمالي الدخل في الشهر</span><b class="t-ok">'+n2(tIn)+' <small>'+esc(c)+'</small></b></div>'+
@@ -1229,17 +1240,17 @@ function openMoney(){
         '<div class="card big"><span class="l">المتوقع في الدرج الآن</span><b>'+n2(exp)+' <small>'+esc(c)+'</small></b></div>'
        :'<div class="card"><span class="l">المحصّل من الطلاب (الكل)</span><b class="t-ok">'+n2(s.collected)+' <small>'+esc(c)+'</small></b></div><div class="card"><span class="l">منها حوالات (خارج الدرج)</span><b>'+n2(trf)+'</b></div><div class="card"><span class="l">دفعات المعلمين</span><b>'+n2(s.teachers)+'</b></div><div class="card"><span class="l">مصروفات</span><b>'+n2(s.expenses)+'</b></div><div class="card"><span class="l">سلف</span><b>'+n2(s.advances)+'</b></div><div class="card"><span class="l">رواتب مدفوعة</span><b>'+n2(s.salaries)+'</b></div><div class="card big"><span class="l">المتوقع في الدرج من حركة اليوم</span><b>'+n2(exp)+' <small>'+esc(c)+'</small></b></div>';
       body.innerHTML='<p class="sub" style="margin-top:0">'+(NEW?'في آخر اليوم عُدّ ما في الدرج وأدخله. ما يُصرف من الخزينة (مثل الإيجار والرواتب) لا يُحسب هنا. عند الإقفال تبقى الفكّة ('+n2(flt)+' '+esc(c)+') في الدرج ويُرحَّل الباقي إلى الخزينة. الإقفال يكون بالترتيب يوماً بعد يوم.':'في آخر اليوم عُدّ ما في الدرج وقارنه بما سجّلته المنظومة. (هذا اليوم قبل بدء الخزينة، فيُحسب بالطريقة القديمة.)')+'</p>'+
-        '<div class="filters frm"><label>اليوم<input id="cs-day" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="YYYY-MM-DD" autocomplete="off" dir="ltr" value="'+esc(day)+'"></label></div>'+
+        '<div class="filters frm"><label>اليوم<input id="cs-day" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off" dir="ltr" value="'+esc(day)+'"></label></div>'+
         '<div class="cards">'+cards+'</div>'+
         (done?'<div class="sub warn">أُقفل هذا اليوم سابقاً (الفعلي '+n2(done.counted)+'، الفرق '+n2(done.diff)+'). الإقفال من جديد يستبدله.</div>':'')+
         '<div class="filters frm"><label>المبلغ الفعلي في الدرج ('+esc(c)+')<input id="cs-cnt" data-fmt="num" inputmode="decimal" autocomplete="off" dir="ltr" value="'+(done?esc(done.counted):'')+'"></label><label class="grow">ملاحظة (اختياري)<input id="cs-note" maxlength="200" value="'+esc(done?done.note:'')+'"></label><button class="btn sm primary" id="cs-go" type="button">'+(done?'إعادة إقفال اليوم':'إقفال اليوم')+'</button></div><div id="cs-diff" class="sub"></div>'+
         '<h3 class="sec">آخر الإقفالات</h3><table class="imp"><thead><tr><th>اليوم</th><th>المتوقع</th><th>الفعلي</th><th>الفرق</th><th>رُحّل للخزينة</th><th>ملاحظة</th><th></th></tr></thead><tbody>'+
-        (list.length?list.map(function(x,k){ var d=Number(x.diff); return '<tr><td dir="ltr">'+esc(x.day)+'</td><td class="n">'+n2(x.expected)+'</td><td class="n">'+n2(x.counted)+'</td><td class="n '+(d<0?'bad':(d>0?'warn':'t-ok'))+'"><b>'+(d===0?'مطابق':(d>0?'زيادة ':'نقص ')+n2(Math.abs(d)))+'</b></td><td class="n">'+(Number(x.to_safe)?n2(x.to_safe):'—')+'</td><td>'+esc(x.note)+'</td><td>'+(k===0?'<button class="btn sm cs-rm" data-d="'+esc(x.day)+'" type="button">حذف</button>':'')+'</td></tr>'; }).join(''):'<tr><td colspan="7" class="empty">لا إقفالات بعد.</td></tr>')+'</tbody></table>';
+        (list.length?list.map(function(x,k){ var d=Number(x.diff); return '<tr><td dir="ltr">'+esc(dmy(x.day))+'</td><td class="n">'+n2(x.expected)+'</td><td class="n">'+n2(x.counted)+'</td><td class="n '+(d<0?'bad':(d>0?'warn':'t-ok'))+'"><b>'+(d===0?'مطابق':(d>0?'زيادة ':'نقص ')+n2(Math.abs(d)))+'</b></td><td class="n">'+(Number(x.to_safe)?n2(x.to_safe):'—')+'</td><td>'+esc(x.note)+'</td><td>'+(k===0?'<button class="btn sm cs-rm" data-d="'+esc(x.day)+'" type="button">حذف</button>':'')+'</td></tr>'; }).join(''):'<tr><td colspan="7" class="empty">لا إقفالات بعد.</td></tr>')+'</tbody></table>';
       var cnt=body.querySelector('#cs-cnt'), df=body.querySelector('#cs-diff');
       function upd(){ if(cnt.value===''){ df.textContent=''; return; } var v=Number(cnt.value), d=v-exp; df.className='sub '+(d<0?'bad':(d>0?'warn':'ok'));
         df.textContent=(d===0?'مطابق تماماً.':(d>0?'زيادة ':'نقص ')+n2(Math.abs(d))+' '+c+'.')+(NEW?(v-flt>=0?' سيُرحَّل إلى الخزينة '+n2(v-flt)+' '+c+' ويبقى في الدرج '+n2(flt)+'.':' المبلغ أقل من الفكّة: سيُكمَل '+n2(flt-v)+' من الخزينة.'):''); }
       cnt.addEventListener('input',upd); upd();
-      body.querySelector('#cs-day').onchange=function(){ if(okDate(this.value)){ cashDay=this.value; render(); } else say('اكتب اليوم هكذا: 2026-10-21','bad'); };
+      body.querySelector('#cs-day').onchange=function(){ if(okDate(this.value)){ cashDay=this.value; render(); } else say('اكتب اليوم هكذا: 21/10/2026','bad'); };
       body.querySelector('#cs-go').onclick=async function(){
         if(cnt.value===''){ say('أدخل المبلغ الفعلي في الدرج.','bad'); return; }
         try{ await rpc('cash_close',{p_day:day,p_counted:Number(cnt.value),p_note:body.querySelector('#cs-note').value}); cashMsg='تم إقفال يوم '+day+'.'; cashCls='ok'; msg=cashMsg; msgCls=cashCls; render(); }
@@ -1269,7 +1280,7 @@ function openMoney(){
     body.querySelector('#ts-go').onclick=async function(){
       var row={id:1,start_date:g('ts-d'),safe_open:Number(g('ts-safe')||0),bank_open:Number(g('ts-bank')||0),drawer_open:Number(g('ts-dr')||0),float_amt:Number(g('ts-fl')||0),
         safe_cats:[].slice.call(body.querySelectorAll('#ts-cats input:checked')).map(function(x){ return x.value; })};
-      if(!okDate(row.start_date)){ say('اكتب تاريخ البدء هكذا: 2026-10-25','bad'); return; }
+      if(!okDate(row.start_date)){ say('اكتب تاريخ البدء هكذا: 25/10/2026','bad'); return; }
       if(g('ts-safe')===''){ say('اكتب رصيد الخزينة (ولو صفراً).','bad'); return; }
       if([row.safe_open,row.bank_open,row.drawer_open,row.float_amt].some(function(v){ return isNaN(v); })||row.drawer_open<0||row.float_amt<0){ say('تحقق من المبالغ.','bad'); return; }
       if(!edit&&!confirm('بدء الخزينة من '+row.start_date+' برصيد '+n2(row.safe_open)+' في الخزينة و'+n2(row.bank_open)+' في المصرف و'+n2(row.drawer_open)+' في الدرج؟')) return;
@@ -1283,13 +1294,13 @@ function openMoney(){
     if(!t.started){ body.innerHTML=trSetupHtml(t,false); fmtInputs(body); trBindSetup(body,t,false); return; }
     var mr=monthRange(trMonth), led=[];
     try{ led=await rpc('treasury_ledger',{p_box:trBox,p_from:mr[0],p_to:mr[1]})||[]; }catch(e){ say(adminErr(e),'bad'); }
-    var bal=0, rows=led.map(function(x){ var a=Number(x.amount); if(x.kind==='carry'){ bal=a; return '<tr class="sub"><td dir="ltr">'+esc(mr[0])+'</td><td>'+esc(x.label)+'</td><td></td><td></td><td class="n"><b>'+n2(bal)+'</b></td></tr>'; }
-      bal+=a; return '<tr><td dir="ltr">'+esc(x.day)+'</td><td>'+esc(x.label)+'</td><td class="n t-ok">'+(a>0?n2(a):'')+'</td><td class="n bad">'+(a<0?n2(-a):'')+'</td><td class="n">'+n2(bal)+'</td></tr>'; });
+    var bal=0, rows=led.map(function(x){ var a=Number(x.amount); if(x.kind==='carry'){ bal=a; return '<tr class="sub"><td dir="ltr">'+esc(dmy(mr[0]))+'</td><td>'+esc(x.label)+'</td><td></td><td></td><td class="n"><b>'+n2(bal)+'</b></td></tr>'; }
+      bal+=a; return '<tr><td dir="ltr">'+esc(dmy(x.day))+'</td><td>'+esc(x.label)+'</td><td class="n t-ok">'+(a>0?n2(a):'')+'</td><td class="n bad">'+(a<0?n2(-a):'')+'</td><td class="n">'+n2(bal)+'</td></tr>'; });
     var forms='';
     if(trForm==='count') forms='<div class="pwbox"><b>جرد</b><p class="sub">عُدّ النقود الموجودة فعلاً واكتبها. إن اختلفت عن الرصيد المحسوب يُسجَّل الفرق بتاريخ اليوم ويُصحَّح الرصيد.</p><form id="tc-f" class="filters frm"><label>الصندوق<select id="tc-b"><option value="safe">الخزينة</option><option value="bank">المصرف</option></select></label><label>المبلغ الموجود فعلاً ('+esc(c)+')<input id="tc-v" data-fmt="num" inputmode="decimal" dir="ltr" autocomplete="off"></label><label class="grow">ملاحظة<input id="tc-n" maxlength="200"></label><button class="btn sm primary" type="submit">تسجيل الجرد</button><button class="btn sm" type="button" id="tc-x">إلغاء</button></form><div id="tc-d" class="sub"></div></div>';
     if(trForm==='move') forms='<div class="pwbox"><b>تحويل بين الأرصدة</b><p class="sub">مثال: إيداع نقود من الخزينة في المصرف، أو سحب من المصرف إلى الخزينة.</p><form id="tm-f" class="filters frm"><label>من<select id="tm-a"><option value="safe">الخزينة</option><option value="bank">المصرف</option><option value="drawer">الدرج</option></select></label><label>إلى<select id="tm-b"><option value="bank">المصرف</option><option value="safe">الخزينة</option><option value="drawer">الدرج</option></select></label><label>المبلغ ('+esc(c)+')<input id="tm-v" data-fmt="num" inputmode="decimal" dir="ltr" autocomplete="off"></label><label>التاريخ<input id="tm-d" data-fmt="date" inputmode="numeric" maxlength="10" dir="ltr" autocomplete="off" value="'+esc(today())+'"></label><label class="grow">ملاحظة<input id="tm-n" maxlength="200" placeholder="مثال: إيداع في المصرف"></label><button class="btn sm primary" type="submit">تسجيل التحويل</button><button class="btn sm" type="button" id="tm-x">إلغاء</button></form></div>';
     body.innerHTML='<div class="cards"><div class="card big"><span class="l">الخزينة</span><b>'+n2(t.safe)+' <small>'+esc(c)+'</small></b></div><div class="card"><span class="l">المصرف</span><b>'+n2(t.bank)+'</b></div><div class="card"><span class="l">الدرج (حسب المنظومة)</span><b>'+n2(t.drawer)+'</b></div><div class="card"><span class="l">المجموع</span><b>'+n2(Number(t.safe)+Number(t.bank)+Number(t.drawer))+'</b></div></div>'+
-      '<p class="sub">بدأت الخزينة يوم '+esc(t.start_date)+' · الفكّة '+n2(t.float_amt)+' · آخر إقفال للدرج: '+esc(t.last_closing||'لا يوجد')+(t.last_count?' · آخر جرد للخزينة: '+esc(t.last_count):'')+'</p>'+
+      '<p class="sub">بدأت الخزينة يوم '+esc(dmy(t.start_date))+' · الفكّة '+n2(t.float_amt)+' · آخر إقفال للدرج: '+esc(t.last_closing?dmy(t.last_closing):'لا يوجد')+(t.last_count?' · آخر جرد للخزينة: '+esc(dmy(t.last_count)):'')+'</p>'+
       '<div class="row wrap" style="margin-bottom:8px"><button class="btn sm primary" type="button" id="tr-count">جرد الخزينة</button><button class="btn sm" type="button" id="tr-move">تحويل بين الأرصدة</button><button class="btn sm" type="button" id="tr-set">إعدادات الخزينة</button></div>'+
       (trForm==='set'?trSetupHtml(t,true):forms)+
       '<h3 class="sec">الحركة</h3><div class="filters frm"><label>الصندوق<select id="tr-box"><option value="safe"'+(trBox==='safe'?' selected':'')+'>الخزينة</option><option value="bank"'+(trBox==='bank'?' selected':'')+'>المصرف</option><option value="drawer"'+(trBox==='drawer'?' selected':'')+'>الدرج</option></select></label><label class="mp">الشهر <input data-fmt="month" inputmode="numeric" maxlength="7" dir="ltr" id="tr-m" value="'+esc(trMonth)+'"></label></div>'+
@@ -1315,7 +1326,7 @@ function openMoney(){
       var mf=body.querySelector('#tm-f');
       body.querySelector('#tm-x').onclick=function(){ trForm=''; render(); };
       mf.onsubmit=async function(ev){ ev.preventDefault(); var a=mf.querySelector('#tm-a').value, b=mf.querySelector('#tm-b').value, v=Number(mf.querySelector('#tm-v').value), d=mf.querySelector('#tm-d').value;
-        if(a===b){ say('اختر صندوقين مختلفين.','bad'); return; } if(!(v>0)){ say('اكتب مبلغاً أكبر من صفر.','bad'); return; } if(!okDate(d)){ say('اكتب التاريخ هكذا: 2026-10-25','bad'); return; }
+        if(a===b){ say('اختر صندوقين مختلفين.','bad'); return; } if(!(v>0)){ say('اكتب مبلغاً أكبر من صفر.','bad'); return; } if(!okDate(d)){ say('اكتب التاريخ هكذا: 25/10/2026','bad'); return; }
         try{ await w('POST','/rest/v1/treasury_moves',{id:uuid(),day:d,kind:'transfer',from_box:a,to_box:b,amount:v,note:mf.querySelector('#tm-n').value.trim()});
           trForm=''; msg='سُجّل التحويل.'; msgCls='ok'; render(); }catch(e){ say(friendly(e).message,'bad'); } };
     }
@@ -1479,7 +1490,7 @@ function openMoney(){
     try{ sm=await rpc('partners_summary',{}); dr=await fetchAll('/rest/v1/partner_draws?select=*&order=drawn_on.desc,created_at.desc'); }catch(e){ body.innerHTML='<div class="bad">'+esc(adminErr(e))+'</div>'; return; }
     var pn=function(id){ var p=sm.partners.filter(function(x){return x.id===id;})[0]; return p?p.name:'(شريك)'; };
     body.innerHTML='<p class="sub" style="margin-top:0">الفائض = كل ما دُفع من الطلاب منذ تاريخ البداية − (المصروفات والإيجار + السلف + رواتب الموظفين + دفعات المعلمين) − ما هو مستحق ولم يُدفع بعد (رواتب، معلمون، وإيجار الأشهر التي لم يُسجَّل إيجارها). تبقى نسبة احتياطي في رصيد المركز، والباقي يُقسَّم بالتساوي بين الشركاء الفعّالين. كل مبلغ يأخذه شريك يُسجَّل كسحب فيُخصم من رصيده.</p>'+
-      '<div class="cards"><div class="card"><span class="l">المحصّل منذ '+esc(sm.start)+'</span><b class="t-ok">'+n2(sm.income)+' <small>'+esc(c)+'</small></b></div>'+
+      '<div class="cards"><div class="card"><span class="l">المحصّل منذ '+esc(dmy(sm.start))+'</span><b class="t-ok">'+n2(sm.income)+' <small>'+esc(c)+'</small></b></div>'+
       '<div class="card"><span class="l">الالتزامات المدفوعة</span><b>'+n2(sm.outflow)+' <small>'+esc(c)+'</small></b></div>'+
       (Number(sm.unpaidTeachers||0)+Number(sm.unpaidSalaries||0)>0?'<div class="card"><span class="l">مستحقات لم تُدفع بعد (معلمون + رواتب)</span><b class="bad">'+n2(Number(sm.unpaidTeachers||0)+Number(sm.unpaidSalaries||0))+' <small>'+esc(c)+'</small></b></div>':'')+
       (Number(sm.unpaidRent||0)>0?'<div class="card"><span class="l">إيجار مستحق لم يُسجَّل بعد</span><b class="bad">'+n2(sm.unpaidRent)+' <small>'+esc(c)+'</small></b></div>':'')+
@@ -1491,12 +1502,12 @@ function openMoney(){
       '<table class="imp"><thead><tr><th>الشريك</th><th>النصيب</th><th>المسحوب</th><th>الرصيد المتاح</th><th></th></tr></thead><tbody>'+sm.partners.map(function(p){ return '<tr data-id="'+esc(p.id)+'"><td><b>'+esc(p.name)+'</b>'+(p.active?'':' <small>(غير فعّال)</small>')+'</td><td class="n">'+n2(p.share)+'</td><td class="n">'+n2(p.drawn)+'</td><td class="n '+(Number(p.balance)<0?'bad':'t-ok')+'"><b>'+n2(p.balance)+'</b></td><td class="nw"><button class="btn sm primary pr-draw" type="button">سحب</button> <button class="btn sm pr-back" type="button"'+(Number(p.drawn)>0?'':' disabled')+'>إرجاع</button> <button class="btn sm pr-edit" type="button">تعديل الاسم</button></td></tr>'; }).join('')+'</tbody></table>'+
       (Number(sm.net)<0?'<p class="bad">الصافي سالب: الالتزامات أكبر من المحصّل منذ تاريخ البداية، فلا يوجد فائض للتوزيع.</p>':'')+
       '<h3 class="sec">الأشهر</h3><table class="imp"><thead><tr><th>الشهر</th><th>المحصّل</th><th>الالتزامات</th><th>الصافي</th></tr></thead><tbody>'+(sm.months.length?sm.months.map(function(m){ return '<tr><td dir="ltr">'+esc(m.month)+'</td><td class="n">'+n2(m.income)+'</td><td class="n">'+n2(m.outflow)+'</td><td class="n '+(Number(m.net)<0?'bad':'')+'">'+n2(m.net)+'</td></tr>'; }).join(''):'<tr><td colspan="4" class="empty">لا حركة منذ تاريخ البداية.</td></tr>')+'</tbody></table>'+
-      '<h3 class="sec">سجل السحوبات والإرجاعات</h3><table class="imp"><tbody>'+(dr.length?dr.map(function(x){ return '<tr><td dir="ltr">'+esc(x.drawn_on)+'</td><td>'+esc(pn(x.partner_id))+'</td><td>'+(Number(x.amount)<0?'<span class="pill ok">إرجاع</span>':'<span class="pill">سحب</span>')+'</td><td class="n '+(Number(x.amount)<0?'t-ok':'')+'">'+n2(Math.abs(Number(x.amount)))+'</td><td>'+esc(x.note||'')+'</td><td><button class="btn sm pr-rm" data-id="'+esc(x.id)+'" data-neg="'+(Number(x.amount)<0?1:0)+'" type="button">إلغاء القيد</button></td></tr>'; }).join(''):'<tr><td class="empty">لا سحوبات.</td></tr>')+'</tbody></table>';
+      '<h3 class="sec">سجل السحوبات والإرجاعات</h3><table class="imp"><tbody>'+(dr.length?dr.map(function(x){ return '<tr><td dir="ltr">'+esc(dmy(x.drawn_on))+'</td><td>'+esc(pn(x.partner_id))+'</td><td>'+(Number(x.amount)<0?'<span class="pill ok">إرجاع</span>':'<span class="pill">سحب</span>')+'</td><td class="n '+(Number(x.amount)<0?'t-ok':'')+'">'+n2(Math.abs(Number(x.amount)))+'</td><td>'+esc(x.note||'')+'</td><td><button class="btn sm pr-rm" data-id="'+esc(x.id)+'" data-neg="'+(Number(x.amount)<0?1:0)+'" type="button">إلغاء القيد</button></td></tr>'; }).join(''):'<tr><td class="empty">لا سحوبات.</td></tr>')+'</tbody></table>';
     var box=body.querySelector('#pr-form');
     body.querySelector('#pr-pdf').onclick=async function(){ var b=this, m=body.querySelector('#pr-m').value; if(!/^\d{4}-\d{2}$/.test(m||'')){ say('اختر الشهر.','bad'); return; } b.disabled=true;
       try{ await downloadPartnersReport(m,sm,dr); say('تم حفظ تقرير الشركاء.','ok'); }catch(e){ if(!(e&&e.code==='declined')) say(e&&e.local?e.message:adminErr(e),'bad'); } b.disabled=false; };
     body.querySelector('#pr-set').onclick=function(){
-      frm(box,'<label>تاريخ بداية الحساب<input name="sd" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="YYYY-MM-DD" autocomplete="off" required dir="ltr" value="'+esc(sm.start)+'"></label><label>احتياطي المركز %<input name="rp" data-fmt="num" inputmode="decimal" autocomplete="off" required dir="ltr" value="'+esc(sm.reservePct)+'"></label><label>الإيجار الشهري ('+esc(c)+')<input name="mr" data-fmt="num" inputmode="decimal" autocomplete="off" dir="ltr" value="'+esc(sm.monthlyRent==null?0:sm.monthlyRent)+'"></label><p class="sub" style="flex-basis:100%;margin:0">يُحجز الإيجار الشهري قبل نصيب الشركاء عن كل شهر لم يُسجَّل فيه مصروف بتصنيف «إيجار». اجعله 0 لإيقاف ذلك.</p>',
+      frm(box,'<label>تاريخ بداية الحساب<input name="sd" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off" required dir="ltr" value="'+esc(sm.start)+'"></label><label>احتياطي المركز %<input name="rp" data-fmt="num" inputmode="decimal" autocomplete="off" required dir="ltr" value="'+esc(sm.reservePct)+'"></label><label>الإيجار الشهري ('+esc(c)+')<input name="mr" data-fmt="num" inputmode="decimal" autocomplete="off" dir="ltr" value="'+esc(sm.monthlyRent==null?0:sm.monthlyRent)+'"></label><p class="sub" style="flex-basis:100%;margin:0">يُحجز الإيجار الشهري قبل نصيب الشركاء عن كل شهر لم يُسجَّل فيه مصروف بتصنيف «إيجار». اجعله 0 لإيقاف ذلك.</p>',
         async function(f){ var rp=Number(f.rp.value), mr=Number(f.mr.value||0); if(!okDate(f.sd.value)||!(rp>=0&&rp<=100)) throw lerr('تحقق من التاريخ ونسبة الاحتياطي (0 إلى 100).'); if(!(mr>=0)) throw lerr('تحقق من مبلغ الإيجار الشهري.'); await w('PATCH','/rest/v1/partner_settings?id=eq.1',{start_date:f.sd.value,reserve_pct:rp,monthly_rent:mr,updated_at:new Date().toISOString()}); },'تم حفظ الإعدادات.');
     };
     body.querySelectorAll('tr[data-id]').forEach(function(tr){
@@ -1530,13 +1541,13 @@ function openMoney(){
       '<table class="imp"><thead><tr><th>المعلم</th><th>الأجر</th><th>محصّل من طلابه / عدد الحصص</th><th>المستحق</th><th>المدفوع</th><th>المتبقي</th><th></th></tr></thead><tbody>'+
       (dues.length?dues.map(function(x){ return '<tr data-id="'+esc(x.teacher_id)+'"><td><b>'+esc(x.name)+'</b>'+(x.active?'':' <small>(متوقف)</small>')+'</td><td>'+(x.pay_type==='percent'?n2(x.rate)+'%':(x.pay_type==='fixed'?'ثابت '+n2(x.rate):(x.pay_type==='none'?'بدون راتب':x.pay_type==='session'?n2(x.rate)+' للحصة':'<span class="bad">غير محدد</span>')))+'</td><td class="n">'+(x.pay_type==='percent'?n2(x.base):(x.pay_type==='session'?n2(x.base)+' حصة':'—'))+'</td><td class="n">'+n2(x.due)+'</td><td class="n t-ok">'+n2(x.paid)+'</td><td class="n '+(Number(x.remaining)>0?'warn':'')+'"><b>'+n2(x.remaining)+'</b></td><td class="nw"><button class="btn sm primary th-pay" type="button"'+(Number(x.remaining)>0?'':' disabled')+'>دفع</button> <button class="btn sm th-edit" type="button">تعديل</button> <button class="btn sm danger th-del" type="button">حذف</button></td></tr>'; }).join(''):'<tr><td colspan="7" class="empty">لا يوجد معلمون بعد.</td></tr>')+'</tbody></table>'+
       '<h3 class="sec">دفعات هذا الشهر</h3><table class="imp"><tbody>'+
-      (function(){ var a=monthRange(month), l=D.tpays.filter(function(x){return inRange(x.paid_on,a[0],a[1]);}); return l.length?l.map(function(x){ return '<tr><td dir="ltr">'+esc(x.paid_on)+'</td><td>'+esc(tn(x.teacher_id))+'</td><td class="n">'+n2(x.amount)+'</td><td>'+esc(x.note||'')+'</td><td><button class="btn sm th-rm" data-id="'+esc(x.id)+'" type="button">حذف</button></td></tr>'; }).join(''):'<tr><td class="empty">لا دفعات.</td></tr>'; })()+'</tbody></table>';
+      (function(){ var a=monthRange(month), l=D.tpays.filter(function(x){return inRange(x.paid_on,a[0],a[1]);}); return l.length?l.map(function(x){ return '<tr><td dir="ltr">'+esc(dmy(x.paid_on))+'</td><td>'+esc(tn(x.teacher_id))+'</td><td class="n">'+n2(x.amount)+'</td><td>'+esc(x.note||'')+'</td><td><button class="btn sm th-rm" data-id="'+esc(x.id)+'" type="button">حذف</button></td></tr>'; }).join(''):'<tr><td class="empty">لا دفعات.</td></tr>'; })()+'</tbody></table>';
     var attHtml=(function(){
       var by={}; tsRows.forEach(function(x){ var e=by[x.teacher_id]=by[x.teacher_id]||{p:[],a:[]}; (x.status==='present'?e.p:e.a).push(x); });
       var gl=function(id){ var g=(window.NOON_GROUPS||[]).filter(function(y){return y.id===id;})[0]; return g?((window.NOON_GRADES||[])[g.grade-1]||'')+' '+g.subject:'(مجموعة)'; };
       var ids=Object.keys(by);
       return '<h3 class="sec">حضور المعلمين في هذا الشهر</h3>'+(ids.length?'<table class="imp"><thead><tr><th>المعلم</th><th>حضر</th><th>غاب</th><th>التفاصيل</th></tr></thead><tbody>'+ids.map(function(id){ var e=by[id];
-        return '<tr><td><b>'+esc(tn(id))+'</b></td><td class="n t-ok">'+e.p.length+'</td><td class="n '+(e.a.length?'bad':'')+'">'+e.a.length+'</td><td><details><summary>عرض الأيام</summary>'+e.p.concat(e.a).sort(function(x,y){return x.day<y.day?-1:1;}).map(function(x){ return '<div class="sub"><span dir="ltr">'+esc(x.day)+'</span> · '+esc(gl(x.group_id))+' · '+(x.status==='present'?'حضر':'<b class="bad">غاب</b>')+'</div>'; }).join('')+'</details></td></tr>'; }).join('')+'</tbody></table>':'<div class="sub">لا يوجد تسجيل حضور للمعلمين في هذا الشهر. يُسجَّل من شاشة «حصص اليوم».</div>');
+        return '<tr><td><b>'+esc(tn(id))+'</b></td><td class="n t-ok">'+e.p.length+'</td><td class="n '+(e.a.length?'bad':'')+'">'+e.a.length+'</td><td><details><summary>عرض الأيام</summary>'+e.p.concat(e.a).sort(function(x,y){return x.day<y.day?-1:1;}).map(function(x){ return '<div class="sub"><span dir="ltr">'+esc(dmy(x.day))+'</span> · '+esc(gl(x.group_id))+' · '+(x.status==='present'?'حضر':'<b class="bad">غاب</b>')+'</div>'; }).join('')+'</details></td></tr>'; }).join('')+'</tbody></table>':'<div class="sub">لا يوجد تسجيل حضور للمعلمين في هذا الشهر. يُسجَّل من شاشة «حصص اليوم».</div>');
     })();
     body.innerHTML=html+attHtml+'<div class="sub '+msgCls+'">'+esc(msg)+'</div>'; bindMonth(body);
     var box=body.querySelector('#th-form');
@@ -1546,7 +1557,7 @@ function openMoney(){
       frm(box,'<label>الاسم<input name="name" required maxlength="80" value="'+esc(t?t.name:'')+'"></label><label>الهاتف<input name="ph" dir="ltr" maxlength="30" value="'+esc(t?t.phone:'')+'"></label>'+
         '<label>نوع الأجر<select name="pt"><option value="percent"'+((!tm||tm.pay_type==='percent')?' selected':'')+'>نسبة من المحصّل %</option><option value="fixed"'+(tm&&tm.pay_type==='fixed'?' selected':'')+'>مبلغ ثابت شهرياً</option><option value="session"'+(tm&&tm.pay_type==='session'?' selected':'')+'>مبلغ لكل حصة</option><option value="none"'+(tm&&tm.pay_type==='none'?' selected':'')+'>بدون راتب (شريك يدرّس)</option></select></label>'+
         '<label>القيمة (نسبة أو مبلغ أو سعر الحصة)<input name="rate" data-fmt="num" inputmode="decimal" autocomplete="off" dir="ltr" value="'+(tm?esc(tm.rate):'')+'"></label>'+
-        '<label>يسري من تاريخ<input name="from" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="YYYY-MM-DD" autocomplete="off" dir="ltr" required value="'+esc(tm?today():today().slice(0,8)+'01')+'"></label>'+
+        '<label>يسري من تاريخ<input name="from" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off" dir="ltr" required value="'+esc(tm?today():today().slice(0,8)+'01')+'"></label>'+
         (t?'<label>الحالة<select name="act"><option value="1"'+(t.active?' selected':'')+'>يعمل</option><option value="0"'+(t.active?'':' selected')+'>متوقف</option></select></label>':''),
         async function(f,sid){
           var name=f.name.value.trim(), pt=f.pt.value, rate=pt==='none'?0:Number(f.rate.value), from=f.from.value;
@@ -1583,13 +1594,13 @@ function openMoney(){
     var e=editExp||{on_date:today(),amount:'',category:'',description:''}; if(!formId) formId=editExp?editExp.id:uuid();
     var cats=DEFAULT_CATS.slice(); D.expenses.forEach(function(x){ if(cats.indexOf(x.category)<0) cats.push(x.category); });
     body.innerHTML=(STAFF?'':monthPicker())+
-      '<form id="ex-f" class="filters frm"><label>التاريخ<input data-fmt="date" inputmode="numeric" maxlength="10" placeholder="YYYY-MM-DD" autocomplete="off" dir="ltr" id="ex-date" required value="'+esc(e.on_date)+'"></label><label>المبلغ ('+esc(c)+')<input  data-fmt="num" inputmode="decimal" autocomplete="off" id="ex-amt" required inputmode="decimal" dir="ltr" value="'+esc(e.amount)+'"></label>'+
+      '<form id="ex-f" class="filters frm"><label>التاريخ<input data-fmt="date" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off" dir="ltr" id="ex-date" required value="'+esc(e.on_date)+'"></label><label>المبلغ ('+esc(c)+')<input  data-fmt="num" inputmode="decimal" autocomplete="off" id="ex-amt" required inputmode="decimal" dir="ltr" value="'+esc(e.amount)+'"></label>'+
       '<label>التصنيف<input id="ex-cat" list="ex-cats" required maxlength="40" value="'+esc(e.category)+'" placeholder="اختر أو اكتب"><datalist id="ex-cats">'+cats.map(function(x){return '<option value="'+esc(x)+'">';}).join('')+'</datalist></label>'+
       '<label class="grow">بماذا صُرف هذا المبلغ؟<input id="ex-desc" required maxlength="200" value="'+esc(e.description)+'" placeholder="مثال: إيجار شهر أكتوبر"></label>'+
       (STAFF?'':'<label>دُفع من<select id="ex-src">'+['drawer','safe','bank'].map(function(k){ return '<option value="'+k+'"'+((e.src||srcFor(e.category))===k?' selected':'')+'>'+BOXN[k]+'</option>'; }).join('')+'</select></label>')+
       '<button class="btn sm primary" type="submit">'+(editExp?'حفظ التعديل':'إضافة مصروف')+'</button>'+(editExp?'<button class="btn sm" type="button" id="ex-x">إلغاء</button>':'')+'</form>'+
       (STAFF?'':'<table class="imp"><thead><tr><th>التاريخ</th><th>التصنيف</th><th>البيان</th><th>سجّله</th><th>المبلغ</th><th></th></tr></thead><tbody>'+
-      (list.length?list.map(function(x){ var mine=!STAFF||(x.created_by&&x.created_by===ME); return '<tr data-id="'+esc(x.id)+'"><td dir="ltr">'+esc(x.on_date)+'</td><td>'+esc(x.category)+(x.src?' <span class="pill '+(x.src==='drawer'?'mute':'info')+'">'+BOXN[x.src]+'</span>':'')+'</td><td>'+esc(x.description)+'</td><td class="sub">'+esc(x.created_by_name||'المالك')+'</td><td class="n" dir="ltr">'+n2(x.amount)+'</td><td class="acts">'+(mine?'<button class="btn sm ex-ed" type="button">تعديل</button> <button class="btn sm ex-rm" type="button">حذف</button>':'')+'</td></tr>'; }).join(''):'<tr><td colspan="6" class="empty">لا مصروفات في هذا الشهر.</td></tr>')+
+      (list.length?list.map(function(x){ var mine=!STAFF||(x.created_by&&x.created_by===ME); return '<tr data-id="'+esc(x.id)+'"><td dir="ltr">'+esc(dmy(x.on_date))+'</td><td>'+esc(x.category)+(x.src?' <span class="pill '+(x.src==='drawer'?'mute':'info')+'">'+BOXN[x.src]+'</span>':'')+'</td><td>'+esc(x.description)+'</td><td class="sub">'+esc(x.created_by_name||'المالك')+'</td><td class="n" dir="ltr">'+n2(x.amount)+'</td><td class="acts">'+(mine?'<button class="btn sm ex-ed" type="button">تعديل</button> <button class="btn sm ex-rm" type="button">حذف</button>':'')+'</td></tr>'; }).join(''):'<tr><td colspan="6" class="empty">لا مصروفات في هذا الشهر.</td></tr>')+
       '</tbody>'+(list.length?'<tfoot><tr><td colspan="4">إجمالي الشهر</td><td class="n" dir="ltr">'+n2(total)+'</td><td></td></tr></tfoot>':'')+'</table>');
     if(!STAFF) bindMonth(body);
     var f=body.querySelector('#ex-f');
@@ -1599,7 +1610,7 @@ function openMoney(){
       ev.preventDefault();
       var row={on_date:f.querySelector('#ex-date').value,amount:Number(f.querySelector('#ex-amt').value),category:f.querySelector('#ex-cat').value.trim(),description:f.querySelector('#ex-desc').value.trim()};
       if(!STAFF) row.src=f.querySelector('#ex-src').value;
-      if(!okDate(row.on_date)){ say('اكتب التاريخ هكذا: 2026-10-21','bad'); return; }
+      if(!okDate(row.on_date)){ say('اكتب التاريخ هكذا: 21/10/2026','bad'); return; }
       if(!(row.amount>0)||!row.category||!row.description){ say('أكمل كل الخانات بمبلغ أكبر من صفر.','bad'); return; }
       try{
         if(editExp) await w('PATCH','/rest/v1/expenses?id=eq.'+editExp.id,row);
@@ -1623,13 +1634,13 @@ function openMoney(){
     if(!D.employees.length) html+='<div class="empty">لا يوجد موظفون بعد. أضف أول موظف.</div>';
     D.employees.forEach(function(e){
       var p=periodOf(e.start_day,t), st=statement(e,p);
-      html+='<div class="card emp'+(e.active?'':' off')+'" data-id="'+esc(e.id)+'"><div class="eh"><b>'+esc(e.name)+(e.active?'':' <small>(متوقف)</small>')+'</b><span class="sub">شهره يبدأ يوم '+e.start_day+' — الفترة الحالية: <span dir="ltr">'+esc(p.start)+' ← '+esc(p.end)+'</span></span></div>'+
+      html+='<div class="card emp'+(e.active?'':' off')+'" data-id="'+esc(e.id)+'"><div class="eh"><b>'+esc(e.name)+(e.active?'':' <small>(متوقف)</small>')+'</b><span class="sub">شهره يبدأ يوم '+e.start_day+' — الفترة الحالية: <span dir="ltr">'+esc(dmy(p.start))+' ← '+esc(p.end)+'</span></span></div>'+
         '<div class="cards sm"><div class="card"><span class="l">الراتب</span><b>'+(st.sal==null?'<span class="bad">غير محدد</span>':n2(st.sal)+' <small>'+esc(c)+'</small>')+'</b></div>'+
         '<div class="card"><span class="l">السلف هذه الفترة</span><b>'+n2(st.advSum)+' <small>'+esc(c)+'</small></b></div>'+
         '<div class="card"><span class="l">المتبقي له</span><b class="'+(st.remaining!=null&&st.remaining<0?'bad':'')+'">'+(st.remaining==null?'—':n2(st.remaining)+' <small>'+esc(c)+'</small>')+'</b></div>'+
         '<div class="card"><span class="l">حالة الراتب</span><b>'+(st.paid?'<span class="t-ok">مدفوع '+n2(st.paid.amount)+'</span>':'غير مدفوع')+'</b></div></div>'+
         (st.remaining!=null&&st.remaining<0?'<div class="sub bad">تنبيه: السلف تجاوزت الراتب بمقدار '+n2(-st.remaining)+'.</div>':'')+
-        (st.adv.length?'<ul class="advs">'+st.adv.map(function(a){ return '<li><span dir="ltr">'+esc(a.on_date)+'</span> — '+n2(a.amount)+(a.note?' ('+esc(a.note)+')':'')+' <button class="btn sm ad-rm" data-ad="'+esc(a.id)+'" type="button">حذف</button></li>'; }).join('')+'</ul>':'')+
+        (st.adv.length?'<ul class="advs">'+st.adv.map(function(a){ return '<li><span dir="ltr">'+esc(dmy(a.on_date))+'</span> — '+n2(a.amount)+(a.note?' ('+esc(a.note)+')':'')+' <button class="btn sm ad-rm" data-ad="'+esc(a.id)+'" type="button">حذف</button></li>'; }).join('')+'</ul>':'')+
         '<div class="row wrap"><button class="btn sm primary em-adv" type="button">تسجيل سلفة</button> '+(st.paid?'':'<button class="btn sm em-pay" type="button">دفع الراتب</button> ')+
         '<button class="btn sm em-edit" type="button">تعديل البيانات والراتب</button> <button class="btn sm em-hist" type="button">الفترات السابقة</button> <button class="btn sm danger em-del" type="button">حذف</button></div><div class="em-sub"></div></div>';
     });
@@ -1659,7 +1670,7 @@ function openMoney(){
     frm(box,'<label>الاسم<input name="name" required maxlength="60" value="'+esc(e?e.name:'')+'"></label>'+
       '<label>يوم بداية شهره (1–31)<input name="sd"  data-fmt="num" inputmode="decimal" autocomplete="off" required dir="ltr" value="'+(e?e.start_day:1)+'"></label>'+
       '<label>الراتب الشهري ('+esc(cur())+')<input name="sal"  data-fmt="num" inputmode="decimal" autocomplete="off" required dir="ltr" value="'+(sal?esc(sal.amount):'')+'"></label>'+
-      '<label>يسري من تاريخ<input name="from" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="YYYY-MM-DD" autocomplete="off" dir="ltr" required value="'+esc(sal?today():periodOf(e?e.start_day:1,today()).start)+'"></label>'+
+      '<label>يسري من تاريخ<input name="from" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off" dir="ltr" required value="'+esc(sal?today():periodOf(e?e.start_day:1,today()).start)+'"></label>'+
       (e?'<label>الحالة<select name="act"><option value="1"'+(e.active?' selected':'')+'>يعمل</option><option value="0"'+(e.active?'':' selected')+'>متوقف</option></select></label>':''),
       async function(f,sid){
         var name=f.name.value.trim(), sd=parseInt(f.sd.value,10), amt=Number(f.sal.value), from=f.from.value;
@@ -1677,7 +1688,7 @@ function openMoney(){
     box.scrollIntoView({block:'nearest'});
   }
   function showAdvForm(box,e,p,st){
-    frm(box,'<label>التاريخ<input name="d" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="YYYY-MM-DD" autocomplete="off" dir="ltr" required value="'+esc(today())+'"></label><label>مبلغ السلفة<input name="a"  data-fmt="num" inputmode="decimal" autocomplete="off" required dir="ltr"></label><label class="grow">ملاحظة (اختياري)<input name="n" maxlength="120"></label>',
+    frm(box,'<label>التاريخ<input name="d" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off" dir="ltr" required value="'+esc(today())+'"></label><label>مبلغ السلفة<input name="a"  data-fmt="num" inputmode="decimal" autocomplete="off" required dir="ltr"></label><label class="grow">ملاحظة (اختياري)<input name="n" maxlength="120"></label>',
       async function(f,sid){
         var a=Number(f.a.value), d=f.d.value; if(!(a>0)||!okDate(d)) throw lerr('أدخل مبلغاً صحيحاً وتاريخاً.');
         var pp=periodOf(e.start_day,d), s2=statement(e,pp);
@@ -1686,7 +1697,7 @@ function openMoney(){
       },'سُجّلت السلفة.');
   }
   function showPayForm(box,e,p,st){
-    frm(box,'<label>الفترة<input disabled dir="ltr" value="'+esc(p.start+' ← '+p.end)+'"></label><label>المبلغ المدفوع (المتبقي بعد السلف)<input name="a"  data-fmt="num" inputmode="decimal" autocomplete="off" required dir="ltr" value="'+(st.remaining!=null?Math.max(0,st.remaining):'')+'"></label><label>تاريخ الدفع<input name="d" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="YYYY-MM-DD" autocomplete="off" dir="ltr" required value="'+esc(today())+'"></label><label class="grow">ملاحظة<input name="n" maxlength="120"></label>',
+    frm(box,'<label>الفترة<input disabled dir="ltr" value="'+esc(dmy(p.start)+' ← '+dmy(p.end))+'"></label><label>المبلغ المدفوع (المتبقي بعد السلف)<input name="a"  data-fmt="num" inputmode="decimal" autocomplete="off" required dir="ltr" value="'+(st.remaining!=null?Math.max(0,st.remaining):'')+'"></label><label>تاريخ الدفع<input name="d" data-fmt="date" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off" dir="ltr" required value="'+esc(today())+'"></label><label class="grow">ملاحظة<input name="n" maxlength="120"></label>',
       async function(f,sid){
         var a=Number(f.a.value); if(!(a>=0)||!okDate(f.d.value)) throw lerr('أدخل المبلغ والتاريخ.');
         try{ await w('POST','/rest/v1/salary_payments',{id:sid,employee_id:e.id,period_start:p.start,amount:a,paid_on:f.d.value,note:f.n.value.trim()}); }catch(er){ if(er.code!=='23505') throw er; }
@@ -1694,7 +1705,7 @@ function openMoney(){
   }
   function showHist(box,e){
     var p=prevPeriod(e.start_day,periodOf(e.start_day,today())), rows=[], first=(D.salaries.filter(function(s){return s.employee_id===e.id;})[0]||{}).from_date||e.created_at.slice(0,10);
-    for(var i=0;i<18&&p.end>=first;i++){ var st=statement(e,p); rows.push('<tr><td dir="ltr">'+esc(p.start)+' ← '+esc(p.end)+'</td><td class="n">'+(st.sal==null?'—':n2(st.sal))+'</td><td class="n">'+n2(st.advSum)+'</td><td class="n">'+(st.remaining==null?'—':n2(st.remaining))+'</td><td>'+(st.paid?'<span class="t-ok">دُفع '+n2(st.paid.amount)+' — '+esc(st.paid.paid_on)+'</span> <button class="btn sm hp-rm" data-id="'+esc(st.paid.id)+'" type="button">إلغاء الدفع</button>':(st.sal!=null&&st.remaining>0?'<button class="btn sm hp-pay" data-s="'+esc(p.start)+'" type="button">تسجيل دفع</button>':'—'))+'</td></tr>'); p=prevPeriod(e.start_day,p); }
+    for(var i=0;i<18&&p.end>=first;i++){ var st=statement(e,p); rows.push('<tr><td dir="ltr">'+esc(dmy(p.start))+' ← '+esc(p.end)+'</td><td class="n">'+(st.sal==null?'—':n2(st.sal))+'</td><td class="n">'+n2(st.advSum)+'</td><td class="n">'+(st.remaining==null?'—':n2(st.remaining))+'</td><td>'+(st.paid?'<span class="t-ok">دُفع '+n2(st.paid.amount)+' — '+esc(st.paid.paid_on)+'</span> <button class="btn sm hp-rm" data-id="'+esc(st.paid.id)+'" type="button">إلغاء الدفع</button>':(st.sal!=null&&st.remaining>0?'<button class="btn sm hp-pay" data-s="'+esc(p.start)+'" type="button">تسجيل دفع</button>':'—'))+'</td></tr>'); p=prevPeriod(e.start_day,p); }
     box.innerHTML='<table class="imp"><thead><tr><th>الفترة</th><th>الراتب</th><th>السلف</th><th>المتبقي</th><th>الدفع</th></tr></thead><tbody>'+(rows.join('')||'<tr><td colspan="5" class="empty">لا فترات سابقة.</td></tr>')+'</tbody></table>';
     box.querySelectorAll('.hp-rm').forEach(function(b){ b.onclick=async function(){ if(!confirm('إلغاء تسجيل هذا الدفع؟')) return;
       try{ await w('DELETE','/rest/v1/salary_payments?id=eq.'+b.dataset.id); if(await load()){ msg='أُلغي تسجيل الدفع.'; msgCls='ok'; render(); } }catch(er){ say(friendly(er).message,'bad'); } }; });
