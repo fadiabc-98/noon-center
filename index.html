@@ -4026,10 +4026,10 @@ function receiptModel(){
   var r=D.byId[S.rc.sid]; if(!r) return null;
   var s=r.subs.filter(function(x){ return x.id===S.rc.sub; })[0]; if(!s) return null;
   var pays=r.pays.filter(function(p){ return p.subId===s.id; }).slice().sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:((a.at||0)-(b.at||0))); });
-  return {no:receiptNo(s),center:S.settings.centerName,cur:S.settings.currency,name:r.st.name,course:s.course||'',session:s.kind==='session',start:s.start,end:s.end,months:s.months,fee:s.fee,paid:s.paid,remaining:s.remaining,pays:pays,today:todayStr(),addr:S.settings.address||'',phone:S.settings.phone||'',rnote:S.settings.receiptNote||'',pack:s.kind==='pack'?{total:(Number(s.sessionsTotal)||0)+(Number(s.sessionsAdjust)||0),left:s.left}:null,subjects:s.subjects||'',discount:Number(s.discount)||0,discountPct:s.discountPct||0,discountReason:s.discountReason||'',discountBy:s.discountBy||''};
+  return {no:receiptNo(s),center:S.settings.centerName,cur:S.settings.currency,name:r.st.name,course:s.course||'',session:s.kind==='session',start:s.start,end:s.end,months:s.months,fee:s.fee,paid:s.paid,remaining:s.remaining,pays:pays,today:todayStr(),addr:S.settings.address||'',phone:S.settings.phone||'',rnote:S.settings.receiptNote||'',days:s.kind==='pack'?rcDays(s.id):[],pack:s.kind==='pack'?{total:(Number(s.sessionsTotal)||0)+(Number(s.sessionsAdjust)||0),left:s.left}:null,subjects:s.subjects||'',discount:Number(s.discount)||0,discountPct:s.discountPct||0,discountReason:s.discountReason||'',discountBy:s.discountBy||''};
 }
 function drawReceipt(m){
-  var W=RC.W, SC=RC.SC, rows=Math.max(m.pays.length,1), H=706+rows*58+440+(m.subjects?130:0)+((m.addr||m.phone||m.rnote)?80:0), dy=m.subjects?130:0;
+  var W=RC.W, SC=RC.SC, rows=Math.max(m.pays.length,1), daysH=(m.days&&m.days.length)?84+m.days.length*46:0, H=706+rows*58+440+(m.subjects?130:0)+daysH+((m.addr||m.phone||m.rnote)?80:0), dy=(m.subjects?130:0)+daysH;
   var cv=document.createElement('canvas'); cv.width=Math.round(W*SC); cv.height=Math.round(H*SC);
   var c=cv.getContext('2d'); c.scale(SC,SC); c.direction='rtl';
   c.fillStyle='#fff'; c.fillRect(0,0,W,H);
@@ -4055,6 +4055,7 @@ function drawReceipt(m){
   else if(m.pack){ cell(xr1,495,colW,'تاريخ البدء',fmtDate(m.start)); cell(xr2,495,colW,'الحصص المتبقية',m.pack.left+' من '+m.pack.total); }
   else { cell(xr1,495,colW,'تاريخ البدء',fmtDate(m.start)); cell(xr2,495,colW,'تاريخ الانتهاء',fmtDate(m.end)); }
   if(m.subjects) cell(R,605,W-2*M,'المواد',m.subjects);
+  if(daysH){ var dy0=605+(m.subjects?130:0); T('أيام الحضور',R,dy0,24,500,MU); m.days.forEach(function(L,i){ T(L,R,dy0+44+i*46,fit(L,W-2*M-10,30,700),700,INK); }); }
   c.save(); c.translate(0,dy);
   // payments table
   T('الدفعات',R,625,30,700,INK);
@@ -5294,6 +5295,20 @@ document.addEventListener('input',function(e){
   var d=latinDigits(t.value).replace(/\D/g,'').slice(0,4), v=d.length>2?d.slice(0,2)+':'+d.slice(2):d;
   if(v!==t.value) t.value=v;
 });
+
+/* ===== receipt: the weekly days a pack student attends (his groups' slots) ===== */
+function rcT12(t){ var m=/^(\d{1,2}):(\d{2})$/.exec(String(t||'')); if(!m) return String(t||''); var h=+m[1], ap=h<12?'ص':'م'; h=h%12||12; return h+':'+m[2]+' '+ap; }
+function rcDays(subId){
+  var gids=(window.NOON_SG||[]).filter(function(x){ return x.sub_id===subId; }).map(function(x){ return x.group_id; });
+  var gs=(window.NOON_GROUPS||[]).filter(function(g){ return gids.indexOf(g.id)>=0; });
+  return gs.map(function(g){
+    var sl=(Array.isArray(g.slots)?g.slots:[]).slice().sort(function(a,b){ return DAYORD.indexOf(a.d)-DAYORD.indexOf(b.d)||String(a.t).localeCompare(String(b.t)); });
+    if(!sl.length) return '';
+    var same=sl.every(function(x){ return x.t===sl[0].t; });
+    var txt=same?sl.map(function(x){ return DAYN[x.d]; }).join('، ')+' — '+rcT12(sl[0].t):sl.map(function(x){ return DAYN[x.d]+' '+rcT12(x.t); }).join('، ');
+    return (gs.length>1||g.subject?g.subject+': ':'')+txt;
+  }).filter(Boolean);
+}
 /* ===================== redesign: topbar user + bell, home hero, stat icons, quick stats ===================== */
 var THP={
   cal:'<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17M9 15l2 2 4-4"/>',
