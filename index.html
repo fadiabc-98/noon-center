@@ -6273,6 +6273,69 @@ document.addEventListener('click',async function(e){
 (function(){ var _ra=renderAttendance; renderAttendance=function(){ _ra.apply(this,arguments); try{ saApply(); }catch(e){ if(window.console) console.error(e); } }; })();
 
 
+/* ===== soft click sounds (generated, no files) + close a window by clicking outside it ===== */
+var SND={k:'noon-snd',ctx:null,last:0};
+function sndLevel(){ try{ var v=localStorage.getItem(SND.k); if(v==='0'||v==='1'||v==='2') return +v; }catch(e){} return 1; }   // 0 off · 1 quiet · 2 normal
+function sndCtx(){ if(!SND.ctx){ var A=window.AudioContext||window.webkitAudioContext; if(!A) return null; try{ SND.ctx=new A(); }catch(e){ return null; } } if(SND.ctx.state==='suspended'){ try{ SND.ctx.resume(); }catch(e){} } return SND.ctx; }
+function snd(kind){
+  var lv=sndLevel(); if(!lv||navigator.webdriver&&!window.__sndTest) return;
+  var c=sndCtx(); if(!c) return; var now=c.currentTime, vol=lv===2?1:0.5;
+  if(kind==='tick'&&performance.now()-SND.last<40) return; SND.last=performance.now();
+  var out=c.createGain(); out.gain.value=vol; out.connect(c.destination);
+  function tone(f0,f1,t0,dur,peak,type){ var o=c.createOscillator(), g=c.createGain(); o.type=type||'sine'; o.frequency.setValueAtTime(f0,now+t0); if(f1) o.frequency.exponentialRampToValueAtTime(f1,now+t0+dur);
+    g.gain.setValueAtTime(0.0001,now+t0); g.gain.exponentialRampToValueAtTime(peak,now+t0+0.006); g.gain.exponentialRampToValueAtTime(0.0001,now+t0+dur); o.connect(g); g.connect(out); o.start(now+t0); o.stop(now+t0+dur+0.02); }
+  if(kind==='tick'){
+    // a short filtered tap + a faint woody body: crisp but soft
+    var n=Math.floor(c.sampleRate*0.018), buf=c.createBuffer(1,n,c.sampleRate), d=buf.getChannelData(0);
+    for(var i=0;i<n;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/n,3);
+    var src=c.createBufferSource(), bp=c.createBiquadFilter(), g=c.createGain(); src.buffer=buf; bp.type='bandpass'; bp.frequency.value=2600; bp.Q.value=1.4; g.gain.value=0.09;
+    src.connect(bp); bp.connect(g); g.connect(out); src.start(now);
+    tone(1150,620,0,0.045,0.035,'sine');
+  }else if(kind==='open'){ tone(520,760,0,0.11,0.04,'sine'); tone(1040,1520,0.005,0.08,0.012,'sine'); }
+  else if(kind==='ok'){ tone(880,0,0,0.16,0.035,'triangle'); tone(1318.5,0,0.09,0.24,0.03,'triangle'); }
+}
+window.__snd=snd;
+var SND_SEL='button,.btn,.chip,.tab-btn,.linklike,a[href],[data-act],[data-xact],[data-xtab],.gs-item,summary,label.seg-o,input[type=checkbox],input[type=radio],select';
+document.addEventListener('pointerdown',function(e){
+  if(e.button>0) return; var el=e.target.closest&&e.target.closest(SND_SEL); if(!el||el.disabled||el.getAttribute('aria-disabled')==='true') return; snd('tick');
+},true);
+(function(){
+  var ov=document.getElementById('overlay'), rc=document.getElementById('rcpt');
+  function watch(el){ if(!el||!window.MutationObserver) return; var was=el.hidden; new MutationObserver(function(){ if(was&&!el.hidden) snd('open'); was=el.hidden; }).observe(el,{attributes:true,attributeFilter:['hidden']}); }
+  watch(ov); watch(rc);
+  if(window.MutationObserver) new MutationObserver(function(ms){ ms.forEach(function(m){ [].forEach.call(m.addedNodes,function(n){ if(n.nodeType===1&&(n.id==='x-modal'||(n.classList&&n.classList.contains('noon-modal')&&!n.classList.contains('xpage')))) snd('open'); }); }); }).observe(document.body,{childList:true});
+  var _toast=toast; toast=function(m){ var r=_toast.apply(this,arguments); try{ if(/^(تم|حُفظ|سُجّل|أُضيف|أُعلنت|أُلغي|حُذف)/.test(String(m||''))) snd('ok'); }catch(e){} return r; };
+})();
+/* settings: a sound row in «المظهر على هذا الجهاز» */
+(function(){
+  var box=document.querySelector('#th-fsbox .th-fs-body'); if(!box||document.getElementById('th-snd')) return;
+  var w=document.createElement('div'); w.id='th-snd';
+  w.innerHTML='<b class="th-fs-t">أصوات النقر</b><p class="sub">صوت خفيف عند النقر وفتح النوافذ ونجاح الحفظ. يُحفظ على هذا الجهاز فقط.</p><div class="th-fs-opts" role="group" aria-label="أصوات النقر">'+[['0','بدون صوت'],['1','هادئ'],['2','عادي']].map(function(o){ return '<button type="button" class="chip" data-snd="'+o[0]+'">'+o[1]+'</button>'; }).join('')+'</div>';
+  box.appendChild(w);
+  function paint(){ var v=String(sndLevel()); w.querySelectorAll('[data-snd]').forEach(function(b){ b.setAttribute('aria-pressed',String(b.dataset.snd===v)); }); }
+  paint();
+  w.addEventListener('click',function(e){ var b=e.target.closest('[data-snd]'); if(!b) return; try{ localStorage.setItem(SND.k,b.dataset.snd); }catch(x){} paint(); setTimeout(function(){ snd('ok'); },60); });
+})();
+
+/* close by clicking the dimmed area; a form with typed changes asks first */
+(function(){
+  var downOn=null;
+  document.addEventListener('input',function(e){ var m=e.target.closest&&e.target.closest('#overlay,.noon-modal:not(.xpage)'); if(m) m.dataset.dirty='1'; },true);
+  var _om=openModal; openModal=function(){ var r=_om.apply(this,arguments); var o=document.getElementById('overlay'); if(o) delete o.dataset.dirty; return r; };
+  document.addEventListener('mousedown',function(e){ downOn=e.target; },true);
+  document.addEventListener('click',function(e){
+    var t=e.target, start=downOn; downOn=null; if(!t||t!==start) return;          // a drag from inside the window never closes it
+    var isOv=t.id==='overlay', isRc=t.id==='rcpt', isNm=t.classList&&t.classList.contains('noon-modal')&&!t.classList.contains('xpage');
+    if(!isOv&&!isRc&&!isNm) return;
+    if(t.dataset.dirty&&!confirm('لديك تغييرات لم تُحفظ. إغلاق النافذة دون حفظ؟')) return;
+    e.preventDefault(); e.stopPropagation();
+    if(isRc){ closeReceipt(); return; }
+    if(isOv){ delete t.dataset.dirty; closeModal(); return; }
+    var x=t.querySelector('.x'); if(x) x.click(); else t.remove();
+  },true);
+})();
+
+
 window.__app={buildBackup:buildBackup,downloadBackup:downloadBackup,buildPdf:buildPdf};
 boot();
 })();
