@@ -420,7 +420,7 @@ async function refreshTables(names){
 }
 var ALL=['students','subs','payments','attendance','settings'];
 /* ---------- class sessions (packs): marks, group links, cancelled sessions ---------- */
-window.NOON_SM=[]; window.NOON_SG=[]; window.NOON_OFF=[]; window.NOON_TS=[]; var smSig='';
+window.NOON_SM=[]; window.NOON_SG=[]; window.NOON_OFF=[]; window.NOON_TS=[]; window.NOON_SPECIAL=[]; var smSig='';
 function addDays(d,n){ var t=new Date(d+'T00:00:00Z'); t.setUTCDate(t.getUTCDate()+n); return t.toISOString().slice(0,10); }
 async function loadSessions(){
   try{
@@ -429,8 +429,9 @@ async function loadSessions(){
     var g=await fetchAll('/rest/v1/subscription_groups?select=sub_id,group_id&order=sub_id.asc,group_id.asc');
     var o=await fetchAll('/rest/v1/group_off?select=group_id,day,note,moved_to,moved_t&or=(day.gte.'+since+',moved_to.gte.'+since+')&order=day.asc,group_id.asc');
     var t=await fetchAll('/rest/v1/teacher_sessions?select=day,group_id,teacher_id,status&day=gte.'+since+'&order=day.asc,group_id.asc');
-    var sig=JSON.stringify([m,g,o,t]);
-    window.NOON_SM=m; window.NOON_SG=g; window.NOON_OFF=o; window.NOON_TS=t;
+    var sp=[]; try{ sp=await fetchAll('/rest/v1/special_days?select=day,kind,title&day=gte.'+since+'&order=day.asc'); }catch(e){ sp=window.NOON_SPECIAL||[]; }   /* table added in a later update */
+    var sig=JSON.stringify([m,g,o,t,sp]);
+    window.NOON_SM=m; window.NOON_SG=g; window.NOON_OFF=o; window.NOON_TS=t; window.NOON_SPECIAL=sp;
     if(sig!==smSig){ smSig=sig; if(window.NOON_REDRAW) window.NOON_REDRAW(); }
   }catch(e){}
 }
@@ -6076,12 +6077,16 @@ function rollRender(){
 var HOL='عطلة';
 function holItems(day){ return todaySessions(day).filter(function(it){ return !it.mk; }); }
 function holOffs(day){ return (window.NOON_OFF||[]).filter(function(o){ return o.day===day&&String(o.note||'').indexOf(HOL)===0; }); }
+var ODN='يوم مفتوح';
+function openDay(day){ return (window.NOON_SPECIAL||[]).filter(function(x){ return x.day===day&&x.kind==='open'; })[0]||null; }
 function holHtml(){
   var day=TD.day, items=holItems(day), hol=holOffs(day), open=items.filter(function(it){ return !it.off; });
   var reason=hol.length?String(hol[0].note).replace(/^عطلة:?\s*/,''):'';
   var h='';
   if(hol.length) h+='<div class="th-hol on"><span class="pill warn">عطلة</span> <b>'+esc(reason||'عطلة')+'</b> — حصص هذا اليوم مؤجّلة ولا تُحتسب على أحد. <span class="th-hol-b"><button class="btn sm wa" type="button" data-xact="hol-wa">إبلاغ الطلاب (واتساب)</button><button class="btn sm" type="button" data-xact="hol-cancel">إلغاء العطلة</button></span></div>';
-  if(open.length) h+='<div class="th-hol"><span class="sub">'+open.length+' حصة في هذا اليوم.</span> <button class="btn sm" type="button" data-xact="hol-new">'+(hol.length?'إضافة باقي الحصص إلى العطلة':'عطلة لهذا اليوم')+'</button></div>';
+  var od=openDay(day);
+  if(od) return '<div class="th-hol on th-open"><span class="pill ok">🎉 يوم مفتوح</span> <b>'+esc(od.title||'يوم مفتوح')+'</b> — حصص هذا اليوم لا تُحتسب على أحد (لا على الباقات ولا للمعلمين). سجّلوا الحضور للمتابعة فقط. <span class="th-hol-b"><button class="btn sm wa" type="button" data-xact="od-wa">دعوة الطلاب (واتساب)</button><button class="btn sm" type="button" data-xact="od-cancel">إلغاء اليوم المفتوح</button></span></div>';
+  if(open.length||!hol.length) h+='<div class="th-hol">'+(open.length?'<span class="sub">'+open.length+' حصة في هذا اليوم.</span> <button class="btn sm" type="button" data-xact="hol-new">'+(hol.length?'إضافة باقي الحصص إلى العطلة':'عطلة لهذا اليوم')+'</button>':'<span class="sub">لا حصص مجموعات في هذا اليوم.</span>')+(hol.length?'':' <button class="btn sm" type="button" data-xact="od-new">🎉 يوم مفتوح</button>')+'</div>';
   return h;
 }
 function holStudents(day){
@@ -6386,6 +6391,71 @@ document.addEventListener('click',function(e){ if(SND_PT==='mouse'&&e.detail>0) 
     if(isOv){ delete t.dataset.dirty; closeModal(); return; }
     var x=t.querySelector('.x'); if(x) x.click(); else t.remove();
   },true);
+})();
+
+
+/* ===== open day (يوم مفتوح): sessions set aside like a holiday, attendance for the record only ===== */
+async function odSet(on,title){
+  var day=TD.day, api=window.NOON_API, prevO=window.NOON_OFF||[], prevS=window.NOON_SPECIAL||[];
+  try{
+    if(on){
+      window.NOON_SPECIAL=prevS.filter(function(x){ return x.day!==day; }).concat([{day:day,kind:'open',title:title||''}]);
+      var rows=holItems(day).filter(function(it){ return !it.off; }).map(function(it){ return {group_id:it.g.id,day:day,note:ODN+(title?': '+title:''),moved_to:null,moved_t:null}; });
+      if(rows.length) window.NOON_OFF=prevO.concat(rows); window.NOON_REDRAW();
+      await api.http('POST','/rest/v1/special_days?on_conflict=day',{body:[{day:day,kind:'open',title:title||''}],headers:{Prefer:'resolution=merge-duplicates,return=minimal'}});
+      if(rows.length) await api.http('POST','/rest/v1/group_off?on_conflict=group_id,day',{body:rows,headers:{Prefer:'resolution=merge-duplicates,return=minimal'}});
+    }else{
+      window.NOON_SPECIAL=prevS.filter(function(x){ return x.day!==day; });
+      window.NOON_OFF=prevO.filter(function(o){ return !(o.day===day&&String(o.note||'').indexOf(ODN)===0); }); window.NOON_REDRAW();
+      await api.http('DELETE','/rest/v1/special_days?day=eq.'+day,{headers:{Prefer:'return=minimal'}});
+      await api.http('DELETE','/rest/v1/group_off?day=eq.'+day+'&note=like.'+encodeURIComponent(ODN+'*'),{headers:{Prefer:'return=minimal'}});
+    }
+  }catch(e){ window.NOON_OFF=prevO; window.NOON_SPECIAL=prevS; window.NOON_REDRAW(); var m=String(e&&e.message||'');
+    toast(/special_days|42P01|relation/.test(m)?'شغّل ملف تحديث قاعدة البيانات الخاص باليوم المفتوح أولاً':'تعذر الحفظ: '+errMsg(e)); return false; }
+  api.reloadSessions(); return true;
+}
+function odText(day,title){
+  return ['السلام عليكم ورحمة الله وبركاته،','يسعد إدارة '+S.settings.centerName+' دعوتكم إلى '+(title?'«'+title+'»، ':'')+'يوم مفتوح للطلبة يوم '+DAYN[wdOf(day)]+' '+fmtDate(day)+'،','فيه أنشطة وألعاب وضيافة، ولن تُعقد فيه الحصص المعتادة.','ننتظركم، وشكراً لكم.'].join('\n');
+}
+function openOdWa(){
+  var day=TD.day, od=openDay(day), text=odText(day,od&&od.title);
+  var list=D.rows.filter(function(r){ return r.st.status!=='withdrawn'&&(r.status.key==='active'||r.status.key==='soon'||r.status.key==='upcoming'); }).sort(function(a,b){ return a.st.name.localeCompare(b.st.name,'ar'); });
+  var rows=list.map(function(r,i){ var ph=ppWaPhone(r);
+    return '<div class="bulk-row" id="ow-'+i+'"><div><b>'+esc(r.st.name)+'</b><div class="sub">'+(ph?waWho(waTargets(r,true)):'<span class="bad">لا يوجد رقم</span>')+'</div></div>'+(ph?'<button class="btn sm wa" type="button" data-xact="ow-go" data-i="'+i+'">إرسال</button>':'')+'</div>'; }).join('');
+  var m=xModal('دعوة الطلاب لليوم المفتوح','<p class="sub" style="margin-top:0">'+list.length+' طالب مشترك حالياً. اضغط «إرسال» أمام كل طالب لتُفتح محادثته والرسالة جاهزة.</p><details class="ppw-msg" open><summary>نص الرسالة</summary><pre>'+esc(text)+'</pre></details>'+(rows?'<div class="bulk-list">'+rows+'</div>':'<div class="empty">لا يوجد طلاب.</div>'));
+  m.__ow={list:list,text:text};
+}
+document.addEventListener('click',async function(e){
+  var el=e.target.closest&&e.target.closest('[data-xact="od-new"],[data-xact="od-go"],[data-xact="od-cancel"],[data-xact="od-wa"],[data-xact="ow-go"]'); if(!el) return;
+  var a=el.dataset.xact, day=TD.day;
+  if(a==='od-new'){
+    var n=holItems(day).filter(function(it){ return !it.off; }).length;
+    xModal('🎉 يوم مفتوح','<p>يوم '+esc(DAYN[wdOf(day)]+' '+fmtDate(day))+' يوم مفتوح للطلبة (أنشطة وألعاب وضيافة).'+(n?' حصص هذا اليوم ('+n+') لن تُحتسب على أحد: لا تُخصم من الباقات، ولا تُحسب للمعلمين بالحصة.':'')+' يمكنكم تسجيل الحضور للمتابعة فقط.</p>'+
+      '<div class="field"><label for="od-t">اسم اليوم (اختياري)</label><input id="od-t" maxlength="80" placeholder="مثال: احتفال نهاية الفصل"></div>'+
+      '<div class="row"><button class="btn primary" type="button" data-xact="od-go">تأكيد اليوم المفتوح</button><button class="btn" type="button" data-xact="close">إلغاء</button></div>');
+    return;
+  }
+  if(a==='od-go'){ var t=(document.getElementById('od-t').value||'').trim(); el.disabled=true; var ok=await odSet(true,t); closeX(); if(ok){ toast('أُعلن اليوم المفتوح 🎉'); setTimeout(openOdWa,300); } return; }
+  if(a==='od-cancel'){ if(!confirm('إلغاء اليوم المفتوح وإرجاع حصص هذا اليوم كما كانت؟')) return; if(await odSet(false)) toast('أُلغي اليوم المفتوح'); return; }
+  if(a==='od-wa'){ openOdWa(); return; }
+  var m=document.getElementById('x-modal'), d=m&&m.__ow; if(!d) return;
+  var r=d.list[+el.dataset.i]; if(!r) return;
+  waSend(waTargets(r,true),d.text,el,function(){ var row=document.getElementById('ow-'+el.dataset.i); if(row) row.classList.add('done'); el.textContent='أُرسلت ✓'; });
+});
+(function(){
+  // the general attendance: an open day asks for nobody, marks are for the record
+  var _off2=thOff; thOff=function(day){ return _off2.apply(this,arguments)||!!openDay(day); };
+  // group cards on an open day: no «postponed / make-up» wording or buttons
+  var _rt4=renderToday; renderToday=function(){ _rt4.apply(this,arguments); try{
+    var od=openDay(TD.day); if(!od) return;
+    document.querySelectorAll('#td-page .td-g.off').forEach(function(card){
+      var sub=card.querySelector('.sub .pill.warn'); if(!sub) return; var line=sub.parentNode;
+      line.innerHTML='<span class="pill ok">🎉 يوم مفتوح</span> لا حصة في هذا اليوم، ولا تُحتسب على أحد.';
+      card.querySelectorAll('[data-xact="td-off"],[data-xact="td-unoff"],[data-xact="td-wa"]').forEach(function(b){ b.remove(); });
+    });
+  }catch(e){ if(window.console) console.error(e); } };
+  var _ad2=renderAttDay; renderAttDay=function(){ _ad2.apply(this,arguments); try{ var od=openDay(S.attDate), n=document.querySelector('#att-sum .th-offnote'); if(od&&n){ n.className='pill ok th-offnote'; n.textContent='🎉 يوم مفتوح'+(od.title?' ('+od.title+')':'')+': الحضور للمتابعة فقط ولا يُحتسب غياب'; } }catch(e){} };
+  var _as2=attendanceStatHtml; attendanceStatHtml=function(){ var h=_as2.apply(this,arguments), t=todayStr(), od=openDay(t); if(od&&/stat-n">عطلة</.test(h)) h=h.replace('stat-n">عطلة<','stat-n">🎉<').replace(/<span class="stat-l">[^<]*<\/span>/,'<span class="stat-l">يوم مفتوح'+(od.title?': '+esc(od.title):'')+'</span>'); return h; };
 })();
 
 
