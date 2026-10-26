@@ -2721,6 +2721,10 @@ html #d-head.has-ph h2::before{display:none}
 .sa-btns .btn[data-s="present"][aria-pressed="true"]{background:var(--ok,#17703F);color:#fff;border-color:transparent}
 .sa-btns .btn[data-s="absent"][aria-pressed="true"]{background:var(--crit,#B3261E);color:#fff;border-color:transparent}
 .em-days{margin:6px 0;font-size:.95em}.em-days .pill{margin:2px}.em-days .ed-rm{border:0;background:none;cursor:pointer;color:var(--crit,#B3261E);padding:0 2px}
+
+/* today page: jump to a date */
+.td-jump{display:inline-flex;align-items:center;gap:6px;margin-inline-start:auto}
+.td-jump input{width:128px;padding:6px 8px}
 </style>
 
 <div id="app" dir="rtl" lang="ar">
@@ -5128,7 +5132,7 @@ function todayHtml(){
   (window.NOON_SM||[]).forEach(function(m){ if(m.day===day) marks[m.group_id+'|'+m.student_id]=m.mark; });
   (window.NOON_TS||[]).forEach(function(t){ if(t.day===day) tsm[t.group_id]=t; });
   var items=todaySessions(day);
-  var h='<div class="td-nav"><button class="btn sm" type="button" data-xact="td-day" data-d="-1">‹ السابق</button><div class="td-date"><b>'+DAYN[wd]+'</b> <span dir="ltr">'+esc(fmtDate(day))+'</span>'+(day===todayStr()?' <span class="pill ok">اليوم</span>':'')+'</div><button class="btn sm" type="button" data-xact="td-day" data-d="1">التالي ›</button>'+(day!==todayStr()?'<button class="btn sm" type="button" data-xact="td-day" data-d="0">اليوم</button>':'')+'</div>';
+  var h='<div class="td-nav"><button class="btn sm" type="button" data-xact="td-day" data-d="-1">‹ السابق</button><div class="td-date"><b>'+DAYN[wd]+'</b> <span dir="ltr">'+esc(fmtDate(day))+'</span>'+(day===todayStr()?' <span class="pill ok">اليوم</span>':'')+'</div><button class="btn sm" type="button" data-xact="td-day" data-d="1">التالي ›</button>'+(day!==todayStr()?'<button class="btn sm" type="button" data-xact="td-day" data-d="0">اليوم</button>':'')+'<label class="td-jump"><span class="sub">انتقل إلى</span><input id="td-go" class="ltr dateinput" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off" value="'+esc(fmtDate(day))+'"></label></div>';
   if(!items.length) return h+'<div class="empty">لا توجد حصص في جدول هذا اليوم. تُضاف المجموعات ومواعيدها من «الجدول والأسعار».</div>';
   var tchs=(window.NOON_TEACHERS||[]).filter(function(x){ return x.active; });
   return h+items.map(function(it){
@@ -5163,8 +5167,15 @@ function todayHtml(){
 }
 function renderToday(){
   var body=document.getElementById('td-page'); if(!body||!TD.open) return;
-  body.innerHTML=todayHtml();
+  try{ body.innerHTML=todayHtml(); }
+  catch(e){   // never freeze on one day: show the day bar and the cause, so the user can move on and report it
+    if(window.console) console.error(e);
+    body.innerHTML='<div class="td-nav"><button class="btn sm" type="button" data-xact="td-day" data-d="-1">‹ السابق</button><div class="td-date"><span dir="ltr">'+esc(fmtDate(TD.day))+'</span></div><button class="btn sm" type="button" data-xact="td-day" data-d="1">التالي ›</button><button class="btn sm" type="button" data-xact="td-day" data-d="0">اليوم</button></div>'+
+      '<div class="empty bad">تعذر عرض هذا اليوم. صوّر هذه الرسالة وأرسلها للمطوّر: '+esc(String(e&&e.message||e)).slice(0,200)+'</div>';
+  }
 }
+document.addEventListener('change',function(e){ if(!e.target||e.target.id!=='td-go') return; var v=parseDIn(e.target.value.trim()); if(!isDate(v)){ toast('اكتب التاريخ هكذا: 05/11/2026'); return; } TD.pp=null; TD.day=v; renderToday(); });
+document.addEventListener('keydown',function(e){ if(e.key==='Enter'&&e.target&&e.target.id==='td-go'){ e.preventDefault(); e.target.dispatchEvent(new Event('change',{bubbles:true})); } });
 function openToday(day){
   if(!allLoaded()){ toast('جارٍ تحميل البيانات…'); return; }
   TD.day=day||TD.day||todayStr();
