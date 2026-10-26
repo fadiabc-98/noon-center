@@ -6340,9 +6340,11 @@ function snd(kind,theme){
 }
 window.__snd=snd;
 var SND_SEL='button,.btn,.chip,.tab-btn,.linklike,a[href],[data-act],[data-xact],[data-xtab],.gs-item,summary,label.seg-o,input[type=checkbox],input[type=radio],select';
-document.addEventListener('pointerdown',function(e){
-  if(e.button>0) return; var el=e.target.closest&&e.target.closest(SND_SEL); if(!el||el.disabled||el.getAttribute('aria-disabled')==='true') return; snd('tick');
-},true);
+function sndTarget(t){ var el=t&&t.closest&&t.closest(SND_SEL); return el&&!el.disabled&&el.getAttribute('aria-disabled')!=='true'?el:null; }
+var SND_PT='mouse';
+// mouse: at the press (instant). touch / pen: only on a real tap (the browser sends «click» only when the finger did not scroll)
+document.addEventListener('pointerdown',function(e){ SND_PT=e.pointerType||'mouse'; if(SND_PT!=='mouse'||e.button>0) return; if(sndTarget(e.target)) snd('tick'); },true);
+document.addEventListener('click',function(e){ if(SND_PT==='mouse'&&e.detail>0) return; if(sndTarget(e.target)) snd('tick'); SND_PT='mouse'; },true);
 (function(){
   var ov=document.getElementById('overlay'), rc=document.getElementById('rcpt');
   function watch(el){ if(!el||!window.MutationObserver) return; var was=el.hidden; new MutationObserver(function(){ if(was&&!el.hidden) snd('open'); was=el.hidden; }).observe(el,{attributes:true,attributeFilter:['hidden']}); }
