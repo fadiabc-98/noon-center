@@ -650,8 +650,22 @@ function openImport(source,label){
       msg.textContent='جارٍ الاستيراد…';
       var rep=await rpc('import_backup',{p:file,p_mode:mode,p_dry:false,p_confirm:mode==='replace'?'REPLACE':null});
       if(!rep.ok){ body.innerHTML='<p class="bad"><b>لم يتغير شيء:</b></p><ul class="bad">'+(rep.errors||[]).map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>'; busy=false; return; }
+      var photoMsg='';
+      if(ownerPart&&Array.isArray(ownerPart.student_photos)&&ownerPart.student_photos.length){
+        /* the owner tables went in before the students existed, and the restored students get NEW ids (the old one is kept in legacy_id):
+           so the photos are matched to their students here, after the import */
+        msg.textContent='جارٍ استعادة صور الطلبة…';
+        try{
+          var sts=await fetchAll('/rest/v1/students?select=id,legacy_id'), byId={}, byOld={};
+          sts.forEach(function(x){ byId[x.id]=x.id; if(x.legacy_id) byOld[x.legacy_id]=x.id; });
+          var have={}; (await fetchAll('/rest/v1/student_photos?select=student_id')).forEach(function(x){ have[x.student_id]=1; });
+          var rowsP=[], seen={}; ownerPart.student_photos.forEach(function(ph){ var t=byId[ph.student_id]||byOld[ph.student_id]; if(t&&!have[t]&&!seen[t]&&ph.data){ seen[t]=1; rowsP.push({student_id:t,data:ph.data,updated_at:ph.updated_at||new Date().toISOString()}); } });
+          for(var k=0;k<rowsP.length;k+=10){ await http('POST','/rest/v1/student_photos?on_conflict=student_id',{body:rowsP.slice(k,k+10),headers:{Prefer:'resolution=ignore-duplicates,return=minimal'}}); }
+          photoMsg='<p class="sub">صور الطلبة المستعادة: <b>'+rowsP.length+'</b> من '+ownerPart.student_photos.length+'.</p>';
+        }catch(e){ photoMsg='<p class="warn">تعذرت استعادة صور الطلبة: '+esc(friendly(e).message)+'</p>'; }
+      }
       await syncNow(true);
-      body.innerHTML='<p class="ok"><b>اكتمل الاستيراد وتمت مطابقته مع الملف.</b></p>'+counts(rep.counts)+
+      body.innerHTML='<p class="ok"><b>اكتمل الاستيراد وتمت مطابقته مع الملف.</b></p>'+counts(rep.counts)+photoMsg+
         (rep.conflicts&&rep.conflicts.length?'<p class="warn">تعارضات لم تُكتب: '+rep.conflicts.length+'</p>':'')+'<div class="row"><button type="button" class="btn primary" id="imp-done">تم</button></div>';
       body.querySelector('#imp-done').onclick=function(){ busy=false; ov.remove(); };
     }catch(e){ var fe=friendly(e); msg.className='sub bad'; msg.textContent=fe.message+' لم يتغير شيء في البيانات.'; go.disabled=false; }
