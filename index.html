@@ -6477,15 +6477,15 @@ function odText(day,title){
   return ['السلام عليكم ورحمة الله وبركاته،','يسعد إدارة '+S.settings.centerName+' دعوتكم إلى '+(title?'«'+title+'»، ':'')+'يوم مفتوح للطلبة يوم '+DAYN[wdOf(day)]+' '+fmtDate(day)+'،','فيه أنشطة وألعاب وضيافة، ولن تُعقد فيه الحصص المعتادة.','ننتظركم، وشكراً لكم.'].join('\n');
 }
 function openOdWa(){
-  var day=TD.day, od=openDay(day), text=odText(day,od&&od.title);
+  var day=TD.day, od=openDay(day), orig=odText(day,od&&od.title), text=orig; try{ var sv=localStorage.getItem('noon-od-msg:'+day); if(sv) text=sv; }catch(e){}
   var list=D.rows.filter(function(r){ return r.st.status!=='withdrawn'&&(r.status.key==='active'||r.status.key==='soon'||r.status.key==='upcoming'); }).sort(function(a,b){ return a.st.name.localeCompare(b.st.name,'ar'); });
   var rows=list.map(function(r,i){ var ph=ppWaPhone(r);
     return '<div class="bulk-row" id="ow-'+i+'"><div><b>'+esc(r.st.name)+'</b><div class="sub">'+(ph?waWho(waTargets(r,true)):'<span class="bad">لا يوجد رقم</span>')+'</div></div>'+(ph?'<button class="btn sm wa" type="button" data-xact="ow-go" data-i="'+i+'">إرسال</button>':'')+'</div>'; }).join('');
-  var m=xModal('دعوة الطلاب لليوم المفتوح','<p class="sub" style="margin-top:0">'+list.length+' طالب مشترك حالياً. اضغط «إرسال» أمام كل طالب لتُفتح محادثته والرسالة جاهزة.</p><details class="ppw-msg" open><summary>نص الرسالة</summary><pre>'+esc(text)+'</pre></details>'+(rows?'<div class="bulk-list">'+rows+'</div>':'<div class="empty">لا يوجد طلاب.</div>'));
-  m.__ow={list:list,text:text};
+  var m=xModal('دعوة الطلاب لليوم المفتوح','<p class="sub" style="margin-top:0">'+list.length+' طالب مشترك حالياً. اضغط «إرسال» أمام كل طالب لتُفتح محادثته والرسالة جاهزة.</p><details class="ppw-msg" open><summary>نص الرسالة (يمكنك تعديله قبل الإرسال)</summary><textarea id="ow-msg" rows="7" style="width:100%;box-sizing:border-box;margin-top:8px">'+esc(text)+'</textarea><div class="row" style="margin-top:6px"><button class="btn sm" type="button" data-xact="ow-reset">استعادة النص الأصلي</button></div></details>'+(rows?'<div class="bulk-list">'+rows+'</div>':'<div class="empty">لا يوجد طلاب.</div>'));
+  m.__ow={list:list,text:text,orig:orig,day:day};
 }
 document.addEventListener('click',async function(e){
-  var el=e.target.closest&&e.target.closest('[data-xact="od-new"],[data-xact="od-go"],[data-xact="od-cancel"],[data-xact="od-wa"],[data-xact="ow-go"]'); if(!el) return;
+  var el=e.target.closest&&e.target.closest('[data-xact="od-new"],[data-xact="od-go"],[data-xact="od-cancel"],[data-xact="od-wa"],[data-xact="ow-go"],[data-xact="ow-reset"]'); if(!el) return;
   var a=el.dataset.xact, day=TD.day;
   if(a==='od-new'){
     var n=holItems(day).filter(function(it){ return !it.off; }).length;
@@ -6498,8 +6498,10 @@ document.addEventListener('click',async function(e){
   if(a==='od-cancel'){ if(!confirm('إلغاء اليوم المفتوح وإرجاع حصص هذا اليوم كما كانت؟')) return; if(await odSet(false)) toast('أُلغي اليوم المفتوح'); return; }
   if(a==='od-wa'){ openOdWa(); return; }
   var m=document.getElementById('x-modal'), d=m&&m.__ow; if(!d) return;
+  if(a==='ow-reset'){ var ta0=document.getElementById('ow-msg'); if(ta0) ta0.value=d.orig; try{ localStorage.removeItem('noon-od-msg:'+d.day); }catch(e){} return; }
   var r=d.list[+el.dataset.i]; if(!r) return;
-  waSend(waTargets(r,true),d.text,el,function(){ var row=document.getElementById('ow-'+el.dataset.i); if(row) row.classList.add('done'); el.textContent='أُرسلت ✓'; });
+  var ta=document.getElementById('ow-msg'), msgT=ta&&ta.value.trim()?ta.value:d.text; try{ if(msgT!==d.orig) localStorage.setItem('noon-od-msg:'+d.day,msgT); else localStorage.removeItem('noon-od-msg:'+d.day); }catch(e){}
+  waSend(waTargets(r,true),msgT,el,function(){ var row=document.getElementById('ow-'+el.dataset.i); if(row) row.classList.add('done'); el.textContent='أُرسلت ✓'; });
 });
 (function(){
   // the general attendance: an open day asks for nobody, marks are for the record
