@@ -6543,6 +6543,10 @@ document.addEventListener('noon-inq-new',function(ev){ try{ var k=(ev.detail&&ev
   }
   var _cv0=coveredOn;
   coveredOn=function(r,date){ if(_cv0.apply(this,arguments)) return true; return date<=todayStr()&&!!packDueSet(date)[r.st.id]; };
+  /* a monthly («حقيبة») student of the group's grade: not in the roster and never charged — he only shows in the group sheet once marked, for the record */
+  function monthlyOf(r,g,date){
+    return (r.st.status||'active')==='active'&&r.st.grade&&Number(r.st.grade)===Number(g.grade)&&r.subs.some(function(x){ return x.kind!=='pack'&&x.kind!=='session'&&x.start<=date&&date<=x.end; });
+  }
   async function linkGroupMarks(date,obj,before){
     if(!date||date>todayStr()||!window.NOON_API||!allLoaded()) return;
     var items=todaySessions(date).filter(function(it){ return !it.off; }); if(!items.length) return;
@@ -6552,7 +6556,7 @@ document.addEventListener('noon-inq-new',function(ev){ try{ var k=(ev.detail&&ev
       var nv=obj[sid]||'', ov=before[sid]||''; if(nv===ov) return;
       var r=D.byId[sid]; if(!r) return;
       items.forEach(function(it){
-        if(!rosterFor(it.g,date).some(function(x){ return x.st.id===sid; })) return;
+        if(!rosterFor(it.g,date).some(function(x){ return x.st.id===sid; })&&!monthlyOf(r,it.g,date)) return;
         var cur=marks[it.g.id+'|'+sid]||'';
         if(nv==='p'&&!cur) todo.push([it.g.id,sid,'p']);
         else if(ov==='p'&&nv!=='p'&&cur==='p') todo.push([it.g.id,sid,'']);
@@ -6563,6 +6567,16 @@ document.addEventListener('noon-inq-new',function(ev){ try{ var k=(ev.detail&&ev
     var added=todo.filter(function(t){ return t[2]==='p'; }).length;
     toast(added?'سُجّل حضوره في '+added+(added===1?' حصة':' حصص')+' من «حصص اليوم»':'أُزيل حضوره من حصص اليوم');
   }
+})();
+
+/* in «حصص اليوم» a monthly student is labelled, so nobody expects a session to be counted for him */
+(function(){
+  var _rt5=renderToday; renderToday=function(){ _rt5.apply(this,arguments); try{
+    document.querySelectorAll('#td-page .td-r').forEach(function(row){
+      var b=row.querySelector('.linklike[data-id]'), pl=row.querySelector('.td-n .pill.mute'); if(!b||!pl||!/بلا باقة/.test(pl.textContent)) return;
+      var r=D.byId[b.dataset.id]; if(r&&r.subs.some(function(x){ return x.kind!=='pack'&&x.kind!=='session'&&x.start<=TD.day&&TD.day<=x.end; })){ pl.className='pill info'; pl.textContent='حقيبة شهرية · للسجل فقط'; }
+    });
+  }catch(e){ if(window.console) console.error(e); } };
 })();
 
 
