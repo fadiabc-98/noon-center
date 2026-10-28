@@ -3581,6 +3581,7 @@ function openDetail(id,opts){
       '<button class="btn" type="button" data-act="panel" data-panel="renew" data-kind="session">تسجيل حصة</button>'+
       '<button class="btn" type="button" data-act="panel" data-panel="renew" data-kind="pack">باقة حصص</button>'+
       '<button class="btn" type="button" data-act="panel" data-panel="remind">نص التذكير</button>'+
+      '<button class="btn wa" type="button" data-xact="wa-free" data-id="'+esc(id)+'">واتساب ولي الأمر</button>'+
       '<button class="btn" type="button" data-act="edit-student" data-id="'+esc(id)+'">تعديل البيانات</button>'+
       '<button class="btn danger push" type="button" data-act="del-student" data-id="'+esc(id)+'">حذف الطالب</button>'+
     '</div>'+
@@ -4937,6 +4938,7 @@ document.addEventListener('click',function(e){
   else if(a==='quickpay') quickPay();
   else if(a==='bulk') bulkReminders();
   else if(a==='wa'){ var r=D.byId[id]; if(r) openWa(r,el); }
+  else if(a==='wa-free'){ var rf=D.byId[id]; if(rf){ var tf=waTargets(rf), sp=toIntl(rf.st.phone||''); if(sp&&!tf.some(function(t){ return t.p===sp; })) tf.push({l:'الطالب',p:sp,raw:String(rf.st.phone).trim()}); waSend(tf,'',el); } }
   else if(a==='bulk-wa'){ var r2=D.byId[id]; if(r2) openWa(r2,el,function(){ var row=el.closest('.bulk-row'); if(row){ row.classList.add('done'); el.textContent='تم ✓'; el.classList.remove('primary'); el.disabled=true; } }); }
   else if(a==='more-go'){ var o=document.getElementById('x-modal'), item=o&&o.__rows&&o.__rows[+el.dataset.i]; closeX(); if(item) item.el.click(); }
   else if(a==='more-out'){ closeX(); var lo=document.getElementById('noon-logout'); if(lo) lo.click(); }
