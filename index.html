@@ -4112,7 +4112,7 @@ function renderAttDay(){
   $('#att-list').innerHTML=rows.map(function(r){
     var sid=r.st.id, m=markOf(d,sid), cov=coveredOn(r,d), st=statusOf(r.subs,d,S.settings.remindDays), pill;
     if(cov) pill=statusPill(st);
-    else if(r.subs.some(function(x){ return x.kind==='pack'&&x.start<=d&&(x.left||0)>0; })) pill='<span class="pill info">باقة: الحضور من «حصص اليوم»</span>';
+    else if(r.subs.some(function(x){ return x.kind==='pack'&&x.start<=d&&(x.left||0)>0; })) pill='<span class="pill info">باقة: حضوره هنا يُسجَّل في حصصه</span>';
     else pill='<span class="pill crit">'+(st.key==='expired'?'اشتراكه منتهٍ':st.key==='upcoming'?'لم يبدأ اشتراكه':'لا يوجد اشتراك ساري')+'</span>';
     var dis=future?' disabled':'';
     return '<div class="att-row"><div class="att-info"><button class="linklike" type="button" data-act="open" data-id="'+esc(sid)+'">'+esc(r.st.name)+'</button>'+
@@ -6519,6 +6519,49 @@ document.addEventListener('click',async function(e){
 
 /* a new inquiry arrived while the page is open: a short notice and the notification sound */
 document.addEventListener('noon-inq-new',function(ev){ try{ var k=(ev.detail&&ev.detail.added)||1; toast(k>1?'وصلت '+k+' استفسارات جديدة':'وصل استفسار جديد'); if(typeof snd==='function') snd('ok'); }catch(e){} });
+
+/* ===== general attendance → the student's group sessions =====
+   «حاضر» in the general attendance means the student came to the center, so he is present in every group he has that day
+   (only sessions with no mark yet are filled; a mark set by hand in «حصص اليوم» is never overwritten — e.g. one group he skipped).
+   Taking «حاضر» back removes the «حاضر» marks of that day. Absence is NOT copied: it charges the pack, so it stays a deliberate choice in «حصص اليوم». */
+(function(){
+  var _sm0=setMarks;
+  setMarks=function(date,obj){
+    var before=Object.assign({},(S.att&&S.att[date])||{});
+    var r=_sm0.apply(this,arguments);
+    try{ linkGroupMarks(date,obj,before); }catch(e){ if(window.console) console.error(e); }
+    return r;
+  };
+  /* pack students are listed in the general attendance on the days one of their groups meets (they used to be left out) */
+  var PD={date:'',t:0,set:null};
+  function packDueSet(date){
+    var now=Date.now(); if(PD.set&&PD.date===date&&now-PD.t<500) return PD.set;
+    var set={}; try{ todaySessions(date).forEach(function(it){ if(it.off) return; rosterFor(it.g,date).forEach(function(r){ if(r.subs.some(function(x){ return x.kind==='pack'&&x.start<=date&&x.groups&&x.groups[it.g.id]; })) set[r.st.id]=1; }); }); }catch(e){}
+    PD={date:date,t:now,set:set}; return set;
+  }
+  var _cv0=coveredOn;
+  coveredOn=function(r,date){ if(_cv0.apply(this,arguments)) return true; return date<=todayStr()&&!!packDueSet(date)[r.st.id]; };
+  async function linkGroupMarks(date,obj,before){
+    if(!date||date>todayStr()||!window.NOON_API||!allLoaded()) return;
+    var items=todaySessions(date).filter(function(it){ return !it.off; }); if(!items.length) return;
+    var marks={}; (window.NOON_SM||[]).forEach(function(m){ if(m.day===date) marks[m.group_id+'|'+m.student_id]=m.mark; });
+    var todo=[]; var ids=Object.keys(obj||{});
+    ids.forEach(function(sid){
+      var nv=obj[sid]||'', ov=before[sid]||''; if(nv===ov) return;
+      var r=D.byId[sid]; if(!r) return;
+      items.forEach(function(it){
+        if(!rosterFor(it.g,date).some(function(x){ return x.st.id===sid; })) return;
+        var cur=marks[it.g.id+'|'+sid]||'';
+        if(nv==='p'&&!cur) todo.push([it.g.id,sid,'p']);
+        else if(ov==='p'&&nv!=='p'&&cur==='p') todo.push([it.g.id,sid,'']);
+      });
+    });
+    if(!todo.length) return;
+    for(var i=0;i<todo.length;i++){ await setMark(date,todo[i][0],todo[i][1],todo[i][2]); }
+    var added=todo.filter(function(t){ return t[2]==='p'; }).length;
+    toast(added?'سُجّل حضوره في '+added+(added===1?' حصة':' حصص')+' من «حصص اليوم»':'أُزيل حضوره من حصص اليوم');
+  }
+})();
 
 
 window.__app={buildBackup:buildBackup,downloadBackup:downloadBackup,buildPdf:buildPdf};
