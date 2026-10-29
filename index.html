@@ -348,13 +348,14 @@ function requireLogin(){
 /* ---------- row <-> document mapping ---------- */
 var MAP={
   students:{path:'students',order:'created_at.asc,id.asc',
-    doc:function(r){ return {name:r.name,phone:r.phone,guardian:r.guardian,guardianPhone:r.guardian_phone,motherPhone:r.mother_phone||'',notes:r.notes,joined:r.joined||'',status:r.status||'active',grade:r.grade||null,at:Date.parse(r.created_at)||0}; },
+    doc:function(r){ return {name:r.name,phone:r.phone,guardian:r.guardian,guardianPhone:r.guardian_phone,motherPhone:r.mother_phone||'',notes:r.notes,joined:r.joined||'',status:r.status||'active',grade:r.grade||null,gradeOther:r.grade_other||'',at:Date.parse(r.created_at)||0}; },
     row:function(d,full){ var o={}; if(full||'name' in d) o.name=d.name; if(full||'phone' in d) o.phone=d.phone||''; if(full||'guardian' in d) o.guardian=d.guardian||'';
-      if(full||'guardianPhone' in d) o.guardian_phone=d.guardianPhone||''; if(full||'motherPhone' in d) o.mother_phone=d.motherPhone||''; if(full||'notes' in d) o.notes=d.notes||''; if(full||'joined' in d) o.joined=d.joined||null; if(full||'status' in d) o.status=d.status||'active'; if(full||'grade' in d) o.grade=d.grade?Number(d.grade):null; return o; }},
+      if(full||'guardianPhone' in d) o.guardian_phone=d.guardianPhone||''; if(full||'motherPhone' in d) o.mother_phone=d.motherPhone||''; if(full||'notes' in d) o.notes=d.notes||''; if(full||'joined' in d) o.joined=d.joined||null; if(full||'status' in d) o.status=d.status||'active'; if(full||'grade' in d) o.grade=d.grade?Number(d.grade):null; if(d.gradeOther||(!full&&'gradeOther' in d)) o.grade_other=String(d.gradeOther||'').slice(0,60); return o; }},
   subs:{path:'subscriptions',order:'created_at.asc,id.asc',
-    doc:function(r){ var o={studentId:r.student_id,course:r.course,start:r.start_date,end:r.end_date,months:r.months,fee:Number(r.fee),at:Date.parse(r.created_at)||0}; if(r.due_on) o.dueOn=r.due_on; if(r.kind==='session') o.kind='session'; if(r.kind==='pack'){ o.kind='pack'; o.sessionsTotal=r.sessions_total; o.sessionsAdjust=r.sessions_adjust||0; } if(Number(r.discount)>0){ o.discount=Number(r.discount); o.discountPct=r.discount_pct==null?null:Number(r.discount_pct); o.discountReason=r.discount_reason||''; o.discountBy=r.discount_by||''; } if(r.teacher_id) o.teacherId=r.teacher_id; if(r.subjects) o.subjects=r.subjects; return o; },
+    doc:function(r){ var o={studentId:r.student_id,course:r.course,start:r.start_date,end:r.end_date,months:r.months,fee:Number(r.fee),at:Date.parse(r.created_at)||0}; if(r.due_on) o.dueOn=r.due_on; if(r.kind==='session') o.kind='session'; if(r.kind==='pack'){ o.kind='pack'; o.sessionsTotal=r.sessions_total; o.sessionsAdjust=r.sessions_adjust||0; } if(Number(r.discount)>0){ o.discount=Number(r.discount); o.discountPct=r.discount_pct==null?null:Number(r.discount_pct); o.discountReason=r.discount_reason||''; o.discountBy=r.discount_by||''; } if(r.teacher_id) o.teacherId=r.teacher_id; if(r.subjects) o.subjects=r.subjects; if(r.vip){ o.vip=true; if(r.minutes) o.minutes=r.minutes; } return o; },
     row:function(d,full){ var o={}; if(full||'studentId' in d) o.student_id=d.studentId; if(full||'course' in d) o.course=d.course; if(full||'start' in d) o.start_date=d.start;
       if(full||'end' in d) o.end_date=d.end; if(full||'months' in d) o.months=d.months; if('dueOn' in d) o.due_on=d.dueOn||null; if(full||'fee' in d) o.fee=d.fee; if(full||'kind' in d) o.kind=d.kind==='session'?'session':(d.kind==='pack'?'pack':'month');
+      if(d.vip){ o.vip=true; if(d.minutes) o.minutes=Number(d.minutes); }
       if(full||'sessionsTotal' in d) o.sessions_total=(d.kind==='pack'||!full)?Number(d.sessionsTotal):null; if(full||'sessionsAdjust' in d) o.sessions_adjust=Number(d.sessionsAdjust)||0;
       if(full||'discount' in d){ o.discount=Number(d.discount)||0; o.discount_pct=d.discountPct||null; o.discount_reason=d.discountReason||''; }
       if(full||'teacherId' in d) o.teacher_id=d.teacherId||null; if(full||'subjects' in d) o.subjects=String(d.subjects||'').slice(0,200); return o; }},
@@ -688,7 +689,7 @@ function openImport(source,label){
 /* ---------- activity log page ---------- */
 var OPS={INSERT:'إضافة',UPDATE:'تعديل',DELETE:'حذف',EXPORT:'تصدير',IMPORT:'استيراد',RESTORE:'استعادة',LOGIN:'دخول',LOGOUT:'خروج',ADMIN:'إجراء إداري'};
 var SECS={students:'الطلاب',subscriptions:'الاشتراكات',payments:'الدفعات',attendance:'الحضور',settings:'الإعدادات',system:'النظام',accounts:'الحسابات',expenses:'المصروفات',employees:'الموظفون',employee_salaries:'رواتب الموظفين',advances:'السلف',salary_payments:'دفع الرواتب',teachers:'المعلمون',teacher_terms:'أجور المعلمين',teacher_payments:'دفعات المعلمين',inquiries:'الاستفسارات',groups:'المجموعات',price_list:'قائمة الأسعار',cash_closings:'إقفال الصندوق',subscription_groups:'مجموعات الباقة',session_marks:'حضور الحصص',group_off:'حصص مؤجلة',teacher_sessions:'حضور المعلمين',partners:'الشركاء',partner_draws:'سحوبات الشركاء',partner_settings:'إعدادات الشركاء',trash:'سلة المحذوفات'};
-var FIELDS={name:'الاسم',phone:'الهاتف',guardian:'ولي الأمر',guardian_phone:'هاتف الأب',mother_phone:'هاتف الأم',notes:'ملاحظات',joined:'تاريخ الانضمام',course:'الدورة',start_date:'البداية',end_date:'النهاية',months:'الأشهر',fee:'الرسوم',kind:'النوع',amount:'المبلغ',paid_on:'تاريخ الدفع',note:'ملاحظة',mark:'العلامة',day:'اليوم',data:'الإعدادات',student_id:'الطالب',sub_id:'الاشتراك',category:'التصنيف',description:'البيان',on_date:'التاريخ',employee_id:'الموظف',period_start:'بداية الفترة',start_day:'يوم بداية الشهر',active:'يعمل',from_date:'يسري من',email:'البريد',role:'الصلاحية',status:'الحالة',method:'طريقة الدفع',discount:'الخصم',discount_pct:'نسبة الخصم',discount_reason:'سبب الخصم',discount_by:'بواسطة',subjects:'المواد',grade:'الصف',subject:'المادة',slots:'مواعيد الحصص',plan:'الخطة',price:'السعر',teacher_id:'المعلم',pay_type:'نوع الأجر',rate:'القيمة',interest:'الاهتمام',follow_up:'موعد المتابعة',created_by:'سجّله',sessions_total:'عدد الحصص',sessions_adjust:'تعديل الرصيد',group_id:'المجموعة',moved_to:'أُجّلت إلى',moved_t:'وقت التعويض',partner_id:'الشريك',drawn_on:'تاريخ السحب',reserve_pct:'الاحتياطي %'};
+var FIELDS={grade_other:'الصف (أخرى)',vip:'حصة VIP',minutes:'مدة الحصة (دقيقة)',name:'الاسم',phone:'الهاتف',guardian:'ولي الأمر',guardian_phone:'هاتف الأب',mother_phone:'هاتف الأم',notes:'ملاحظات',joined:'تاريخ الانضمام',course:'الدورة',start_date:'البداية',end_date:'النهاية',months:'الأشهر',fee:'الرسوم',kind:'النوع',amount:'المبلغ',paid_on:'تاريخ الدفع',note:'ملاحظة',mark:'العلامة',day:'اليوم',data:'الإعدادات',student_id:'الطالب',sub_id:'الاشتراك',category:'التصنيف',description:'البيان',on_date:'التاريخ',employee_id:'الموظف',period_start:'بداية الفترة',start_day:'يوم بداية الشهر',active:'يعمل',from_date:'يسري من',email:'البريد',role:'الصلاحية',status:'الحالة',method:'طريقة الدفع',discount:'الخصم',discount_pct:'نسبة الخصم',discount_reason:'سبب الخصم',discount_by:'بواسطة',subjects:'المواد',grade:'الصف',subject:'المادة',slots:'مواعيد الحصص',plan:'الخطة',price:'السعر',teacher_id:'المعلم',pay_type:'نوع الأجر',rate:'القيمة',interest:'الاهتمام',follow_up:'موعد المتابعة',created_by:'سجّله',sessions_total:'عدد الحصص',sessions_adjust:'تعديل الرصيد',group_id:'المجموعة',moved_to:'أُجّلت إلى',moved_t:'وقت التعويض',partner_id:'الشريك',drawn_on:'تاريخ السحب',reserve_pct:'الاحتياطي %'};
 function studentName(id){ var s=cache.students.filter(function(x){return x.id===id;})[0]; return s?s.name:null; }
 function fieldVal(k,v){
   if(v==null||v==='') return '—';
@@ -2773,6 +2774,16 @@ html #d-head.has-ph h2::before{display:none}
 /* today page: jump to a date */
 .td-jump{display:inline-flex;align-items:center;gap:6px;margin-inline-start:auto}
 .td-jump input{width:128px;padding:6px 8px}
+
+/* VIP session (gold) */
+.vip-only{display:none}
+.subfields[data-vip="1"] .vip-only{display:block}
+.subfields[data-vip="1"] .plan-only,.subfields[data-vip="1"] .sg-field{display:none!important}
+label.vip-chk{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1px solid #CBA131;background:linear-gradient(135deg,#fff8dc,#f4e2a1);color:#6b4e00;font-weight:700;cursor:pointer}
+label.vip-chk input{width:18px;height:18px;accent-color:#b8860b}
+.pill.vip{background:linear-gradient(135deg,#f6dc7c,#CBA131);color:#4a3500;font-weight:800;border:1px solid #b8901f}
+.btn.vip{background:linear-gradient(135deg,#f6dc7c,#CBA131);color:#4a3500;font-weight:800;border-color:#b8901f}
+html[data-theme="dark"] label.vip-chk{background:linear-gradient(135deg,#4a3b0e,#3a2f0c);color:#f6dc7c}
 </style>
 
 <div id="app" dir="rtl" lang="ar">
@@ -3308,7 +3319,7 @@ function filteredRows(){
       var hay=norm(r.st.name)+' '+norm(r.st.phone)+' '+norm(r.st.guardian)+' '+norm(r.st.guardianPhone)+' '+norm(r.st.motherPhone||'');
       if(hay.indexOf(q)<0) return false;
     }
-    if(S.gradeF&&String(r.st.grade||'')!==S.gradeF) return false;
+    if(S.gradeF&&(S.gradeF==='other'?(r.st.grade||!r.st.gradeOther):String(r.st.grade||'')!==S.gradeF)) return false;
     var k=r.status.key, st0=r.st.status||'active';
     if(f==='paused'||f==='withdrawn') return st0===f;
     if((f==='active'||f==='soon'||f==='expired')&&st0!=='active') return false;
@@ -3337,7 +3348,7 @@ function renderStudents(){
     var s=r.status;
     return '<tr data-id="'+esc(r.st.id)+'">'+
       '<td><button class="linklike" type="button" data-act="open" data-id="'+esc(r.st.id)+'">'+esc(r.st.name)+'</button>'+
-        (r.st.status&&r.st.status!=='active'?' <span class="pill mute">'+(r.st.status==='paused'?'موقوف':'منسحب')+'</span>':'')+(r.st.grade?'<div class="sub">'+esc(GRADE_NAMES()[r.st.grade-1]||'')+'</div>':'')+(r.st.phone?'<div class="sub"><bdi dir="ltr">'+esc(r.st.phone)+'</bdi></div>':'')+'</td>'+
+        (r.st.status&&r.st.status!=='active'?' <span class="pill mute">'+(r.st.status==='paused'?'موقوف':'منسحب')+'</span>':'')+(gradeText(r.st)?'<div class="sub">'+esc(gradeText(r.st))+'</div>':'')+(r.st.phone?'<div class="sub"><bdi dir="ltr">'+esc(r.st.phone)+'</bdi></div>':'')+'</td>'+
       '<td>'+esc(s.course||'—')+'</td>'+
       '<td class="n">'+(s.pack?packCell(s):s.end?fmtDate(s.end)+'<div class="sub">'+esc(statusSub(s))+'</div>':(s.key==='visit'?'<span class="sub">حصة بتاريخ '+fmtDate(s.visitDate)+'</span>':'—'))+'</td>'+
       '<td>'+statusPill(s)+'</td>'+
@@ -3433,6 +3444,8 @@ function subFieldsHtml(pre,o){
     '<div class="field wide pack-only"><label>المجموعات المشمولة بالباقة</label><div class="grp-list" data-grplist>'+sessGroupsHtml(o.grade,null)+'</div></div>'+
     '<div class="field pack-only"><label for="'+pre+'-sessions">عدد الحصص (الافتراضي: حصص الأسبوع × 4)</label><input id="'+pre+'-sessions" data-f="sessions" inputmode="numeric" maxlength="3" class="ltr" value="'+esc(o.sessions||'')+'"></div>'+
     planSelectHtml(pre,o)+
+    '<div class="field wide session-only vip-box"><label class="vip-chk"><input type="checkbox" data-f="vip"'+(o.vip?' checked':'')+'><span>حصة VIP — الطالب يحضر وحده (قد تصل إلى 3 ساعات)</span></label></div>'+
+    '<div class="field vip-only"><label for="'+pre+'-minutes">مدة الحصة</label><select id="'+pre+'-minutes" data-f="minutes">'+[60,90,120,150,180].map(function(m){ return '<option value="'+m+'"'+((o.minutes||60)===m?' selected':'')+'>'+vipDur(m)+'</option>'; }).join('')+'</select></div>'+
     '<div class="field wide"><label for="'+pre+'-course">الدورة</label><input id="'+pre+'-course" data-f="course" list="courses-list" autocomplete="off" value="'+esc(o.course||'')+'"></div>'+
     '<div class="field wide"><label for="'+pre+'-subjects">المواد أو تفاصيل الدورة (اختياري، تظهر في الإيصال)</label><input id="'+pre+'-subjects" data-f="subjects" maxlength="100" autocomplete="off" placeholder="مثال: رياضيات + فيزياء" value="'+esc(o.subjects||'')+'"></div>'+
     '<div class="field"><label for="'+pre+'-start" data-lbl="start">'+(ses?'تاريخ الحصة':'تاريخ البداية')+'</label><input id="'+pre+'-start" data-f="start" class="ltr dateinput" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" autocomplete="off" value="'+esc(fmtDate(o.start||''))+'"></div>'+
@@ -3454,6 +3467,8 @@ function readSubFields(box,required){
   var course=g('course'), feeRaw=g('fee'), paidRaw=g('paid');
   if(session&&!course) course='حصة منفردة';
   if(pack&&!course) course='باقة حصص';
+  var vipEl=box.querySelector('[data-f="vip"]'), vip=!!(session&&vipEl&&vipEl.checked);
+  if(vip&&(!course||course==='حصة منفردة')) course='حصة VIP';
   if(!course&&!required){
     if(feeRaw||paidRaw) return {error:'اكتب اسم الدورة، أو أفرغ حقول الرسوم والمدفوع إن لم تكن تريد اشتراكاً الآن.'};
     return {skip:true};
@@ -3491,7 +3506,7 @@ function readSubFields(box,required){
   var pdEl=box.querySelector('[data-f="paydate"]'), payDate='';
   if(pdEl&&paid>0){ payDate=parseDIn(pdEl.value.trim()); if(!isDate(payDate)) return {error:'تاريخ الدفعة غير صحيح. اكتبه بالشكل 05/11/2026.'}; if(payDate>todayStr()) return {error:'تاريخ الدفعة لا يمكن أن يكون في المستقبل.'}; }
   var tEl=box.querySelector('[data-f="teacher"]');
-  return {payDate:payDate,sessions:pack?sn:0,groups:pack?gl:(session&&box.querySelector('[data-f="sgroup"]')&&box.querySelector('[data-f="sgroup"]').value?[box.querySelector('[data-f="sgroup"]').value]:[]),subjects:g('subjects'),kind:session?'session':(pack?'pack':'month'),course:course,start:start,months:months,end:end,fee:net,paid:paid,discount:disc,discountPct:dpct,discountReason:disc>0?dreason:'',method:g('method')==='transfer'?'transfer':'cash',teacherId:tEl&&tEl.value?tEl.value:''};
+  return {vip:vip,minutes:vip?(Number(g('minutes'))||60):null,payDate:payDate,sessions:pack?sn:0,groups:pack?gl:(session&&!vip&&box.querySelector('[data-f="sgroup"]')&&box.querySelector('[data-f="sgroup"]').value?[box.querySelector('[data-f="sgroup"]').value]:[]),subjects:g('subjects'),kind:session?'session':(pack?'pack':'month'),course:course,start:start,months:months,end:end,fee:net,paid:paid,discount:disc,discountPct:dpct,discountReason:disc>0?dreason:'',method:g('method')==='transfer'?'transfer':'cash',teacherId:tEl&&tEl.value?tEl.value:''};
 }
 function autoFee(box){
   if(!box) return;
@@ -3505,7 +3520,7 @@ function autoFee(box){
 async function writeSub(studentId,v){
   if(v.paid>0&&v.payDate&&!(await confirmClosedDay(v.payDate))) throw new Error('لم يُحفظ الاشتراك بسبب إقفال ذلك اليوم.');
   var ref=S.db.collection('subs').doc();
-  await ref.set(Object.assign({studentId:studentId,course:v.course,start:v.start,months:v.months,end:v.end,fee:v.fee,at:Date.now()},v.kind==='session'?{kind:'session'}:v.kind==='pack'?{kind:'pack',sessionsTotal:v.sessions,sessionsAdjust:0}:{},v.discount>0?{discount:v.discount,discountPct:v.discountPct,discountReason:v.discountReason}:{},v.subjects?{subjects:v.subjects}:{},v.teacherId?{teacherId:v.teacherId}:{}));
+  await ref.set(Object.assign({studentId:studentId,course:v.course,start:v.start,months:v.months,end:v.end,fee:v.fee,at:Date.now()},v.kind==='session'?{kind:'session'}:v.kind==='pack'?{kind:'pack',sessionsTotal:v.sessions,sessionsAdjust:0}:{},(v.vip?{vip:true,minutes:v.minutes||60}:{}),v.discount>0?{discount:v.discount,discountPct:v.discountPct,discountReason:v.discountReason}:{},v.subjects?{subjects:v.subjects}:{},v.teacherId?{teacherId:v.teacherId}:{}));
   if(v.groups&&v.groups.length){
     try{ await window.NOON_API.http('POST','/rest/v1/subscription_groups',{body:v.groups.map(function(g){ return {sub_id:ref.id,group_id:g}; }),headers:{Prefer:'return=minimal'}}); await window.NOON_API.reloadSessions(); }
     catch(e){ try{ await ref.delete(); }catch(x){} throw e; }
@@ -3523,7 +3538,8 @@ function openStudentForm(id){
     '<div class="fgrid">'+
       '<div class="field wide"><label for="fs-name">الاسم الكامل</label><input id="fs-name" maxlength="120" value="'+esc(st.name||'')+'" autocomplete="off"></div>'+
       '<div class="field"><label for="fs-phone">هاتف الطالب</label><input id="fs-phone" class="ltr" inputmode="tel" value="'+esc(st.phone||'')+'"></div>'+
-      '<div class="field"><label for="fs-grade">الصف</label><select id="fs-grade"><option value="">— اختر —</option>'+GRADE_NAMES().map(function(n,i){ return '<option value="'+(i+1)+'"'+(st.grade===i+1?' selected':'')+'>'+n+'</option>'; }).join('')+'</select></div>'+
+      '<div class="field"><label for="fs-grade">الصف</label><select id="fs-grade"><option value="">— اختر —</option>'+GRADE_NAMES().map(function(n,i){ return '<option value="'+(i+1)+'"'+(st.grade===i+1?' selected':'')+'>'+n+'</option>'; }).join('')+'<option value="other"'+(!st.grade&&st.gradeOther?' selected':'')+'>أخرى (معهد، محاسبة…)</option></select></div>'+
+      '<div class="field" id="fs-go-wrap"'+(!st.grade&&st.gradeOther?'':' hidden')+'><label for="fs-go">اكتب الصف / المرحلة</label><input id="fs-go" maxlength="60" placeholder="مثال: معهد، محاسبة" value="'+esc(st.gradeOther||'')+'"></div>'+
       '<div class="field"><label for="fs-guardian">ولي الأمر</label><input id="fs-guardian" maxlength="120" value="'+esc(st.guardian||'')+'"></div>'+
       '<div class="field"><label for="fs-gphone">هاتف الأب</label><input id="fs-gphone" class="ltr" inputmode="tel" value="'+esc(st.guardianPhone||'')+'"></div>'+
       '<div class="field"><label for="fs-mphone">هاتف الأم</label><input id="fs-mphone" class="ltr" inputmode="tel" value="'+esc(st.motherPhone||'')+'"></div>'+
@@ -3545,7 +3561,8 @@ async function submitStudent(form){
   if(!name){ err.textContent='اكتب اسم الطالب.'; return; }
   var data={name:name,phone:latinDigits($('#fs-phone').value).trim(),guardian:$('#fs-guardian').value.trim(),guardianPhone:latinDigits($('#fs-gphone').value).trim(),motherPhone:latinDigits(($('#fs-mphone')||{value:''}).value).trim(),notes:$('#fs-notes').value.trim()};
   if(id&&$('#fs-status')) data.status=$('#fs-status').value;
-  data.grade=$('#fs-grade').value?Number($('#fs-grade').value):null;
+  data.grade=gradeVal($('#fs-grade').value);
+  if($('#fs-grade').value==='other'){ var go=($('#fs-go').value||'').trim(), pv=(id&&D.byId[id])?D.byId[id].st:{}; if(go||pv.gradeOther) data.gradeOther=go; } else if(id&&D.byId[id]&&D.byId[id].st.gradeOther) data.gradeOther='';
   var sub=null;
   if(!id){
     sub=readSubFields(form.querySelector('fieldset'),false);
@@ -3580,6 +3597,7 @@ function openDetail(id,opts){
       '<button class="btn" type="button" data-act="panel" data-panel="renew">اشتراك جديد / تجديد</button>'+
       '<button class="btn" type="button" data-act="panel" data-panel="renew" data-kind="session">تسجيل حصة</button>'+
       '<button class="btn" type="button" data-act="panel" data-panel="renew" data-kind="pack">باقة حصص</button>'+
+      '<button class="btn vip" type="button" data-act="panel" data-panel="renew" data-kind="session" data-vip="1">حصة VIP</button>'+
       '<button class="btn" type="button" data-act="panel" data-panel="remind">نص التذكير</button>'+
       '<button class="btn wa" type="button" data-xact="wa-free" data-id="'+esc(id)+'">واتساب ولي الأمر</button>'+
       '<button class="btn" type="button" data-act="edit-student" data-id="'+esc(id)+'">تعديل البيانات</button>'+
@@ -3629,7 +3647,7 @@ function renderDetail(){
   if(st.guardian) contacts.push('ولي الأمر: '+esc(st.guardian));
   if(st.guardianPhone) contacts.push('الأب: <bdi dir="ltr">'+esc(st.guardianPhone)+'</bdi>');
   if(st.motherPhone) contacts.push('الأم: <bdi dir="ltr">'+esc(st.motherPhone)+'</bdi>');
-  $('#d-head').innerHTML='<h2>'+esc(st.name)+(st.grade?' <small class="muted">— '+esc(GRADE_NAMES()[st.grade-1]||'')+'</small>':'')+'</h2><div class="sub" style="margin-top:4px">'+statusPill(r.status)+(st.status==='paused'?' <span class="pill warn">موقوف مؤقتاً</span>':st.status==='withdrawn'?' <span class="pill crit">منسحب</span>':'')+' '+esc(r.status.course||'')+(r.status.pack&&r.status.sessLeft!=null?' · المتبقي '+r.status.sessLeft+' حصة':r.status.end?' · ينتهي '+fmtDate(r.status.end):'')+'</div>'+
+  $('#d-head').innerHTML='<h2>'+esc(st.name)+(gradeText(st)?' <small class="muted">— '+esc(gradeText(st))+'</small>':'')+'</h2><div class="sub" style="margin-top:4px">'+statusPill(r.status)+(st.status==='paused'?' <span class="pill warn">موقوف مؤقتاً</span>':st.status==='withdrawn'?' <span class="pill crit">منسحب</span>':'')+' '+esc(r.status.course||'')+(r.status.pack&&r.status.sessLeft!=null?' · المتبقي '+r.status.sessLeft+' حصة':r.status.end?' · ينتهي '+fmtDate(r.status.end):'')+'</div>'+
     (contacts.length?'<div class="sub" style="margin-top:6px">'+contacts.join(' · ')+'</div>':'')+
     (st.notes?'<div class="sub" style="margin-top:4px">'+esc(st.notes)+'</div>':'')+
     '<div class="sub" style="margin-top:4px">تاريخ التسجيل: '+(st.joined?fmtDate(st.joined):'—')+'</div>';
@@ -3639,7 +3657,7 @@ function renderDetail(){
     '<div class="kv"><span class="sub">المتبقي</span><b class="'+(r.balance>0?'t-crit':'')+'">'+(r.balance>0?esc(mny(r.balance)):(r.balance<0?'زيادة '+esc(mny(-r.balance)):'مسدّد'))+'</b></div>';
 
   $('#d-subs').innerHTML=orphanHtml(r)+(r.subs.length?r.subs.map(function(s){
-    var ss=subState(s,today), sess=s.kind==='session', pill=sess?'<span class="pill info">حصة منفردة</span>':s.kind==='pack'?'<span class="pill info">باقة حصص</span>':ss==='active'?'<span class="pill ok">ساري</span>':ss==='upcoming'?'<span class="pill info">لم يبدأ</span>':'<span class="pill mute">منتهي</span>';
+    var ss=subState(s,today), sess=s.kind==='session', pill=sess?(s.vip?'<span class="pill vip">VIP · '+esc(vipDur(s.minutes))+'</span>':'<span class="pill info">حصة منفردة</span>'):s.kind==='pack'?'<span class="pill info">باقة حصص</span>':ss==='active'?'<span class="pill ok">ساري</span>':ss==='upcoming'?'<span class="pill info">لم يبدأ</span>':'<span class="pill mute">منتهي</span>';
     return '<div class="item"><div class="i-main"><b>'+esc(s.course)+'</b><div class="sub">'+(sess?'حصة بتاريخ '+fmtDate(s.start):s.kind==='pack'?'باقة '+((s.sessionsTotal||0)+(s.sessionsAdjust||0))+' حصة · تبدأ '+fmtDate(s.start):'من '+fmtDate(s.start)+' إلى '+fmtDate(s.end)+' · '+esc(s.months||'')+' شهر')+(teacherName(s.teacherId)?' · '+esc(teacherName(s.teacherId)):'')+'</div>'+(s.kind==='pack'?packInfoHtml(s):'')+(s.kind==='session'&&sessGroupOf(s)?'<div class="sub">يحضر مع: <b>'+esc(grpName(sessGroupOf(s)))+'</b> (حصص اليوم)</div>':'')+(s.subjects?'<div class="sub">المواد: '+esc(s.subjects)+'</div>':'')+(s.discount>0?'<div class="sub t-ok">خصم '+esc(money(s.discount))+(s.discountPct?' ('+esc(s.discountPct)+'%)':'')+' — '+esc(s.discountReason||'')+(s.discountBy?' · '+esc(s.discountBy):'')+'</div>':'')+'</div>'+
       '<div class="i-nums"><span>الرسوم '+esc(money(s.fee))+'</span><span>المدفوع '+esc(money(s.paid))+'</span><span class="'+(s.remaining>0?'t-crit':'')+'">المتبقي '+esc(money(s.remaining))+'</span></div>'+
       '<div class="i-act">'+pill+'<button class="btn sm" type="button" data-act="receipt" data-sub="'+esc(s.id)+'">إيصال</button>'+(s.remaining>0?'<button class="btn sm" type="button" data-act="panel" data-panel="pay" data-sub="'+esc(s.id)+'">دفعة</button>':'')+
@@ -4237,7 +4255,7 @@ function receiptModel(){
   var r=D.byId[S.rc.sid]; if(!r) return null;
   var s=r.subs.filter(function(x){ return x.id===S.rc.sub; })[0]; if(!s) return null;
   var pays=r.pays.filter(function(p){ return p.subId===s.id; }).slice().sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:((a.at||0)-(b.at||0))); });
-  return {no:receiptNo(s),center:S.settings.centerName,cur:S.settings.currency,name:r.st.name,course:s.course||'',session:s.kind==='session',start:s.start,end:s.end,months:s.months,fee:s.fee,paid:s.paid,remaining:s.remaining,pays:pays,today:todayStr(),addr:S.settings.address||'',phone:S.settings.phone||'',rnote:S.settings.receiptNote||'',photo:(RC.ph&&RC.ph.sid===r.st.id)?RC.ph.img:null,days:s.kind==='pack'?rcDays(s.id):[],pack:s.kind==='pack'?{total:(Number(s.sessionsTotal)||0)+(Number(s.sessionsAdjust)||0),left:s.left}:null,subjects:s.subjects||'',discount:Number(s.discount)||0,discountPct:s.discountPct||0,discountReason:s.discountReason||'',discountBy:s.discountBy||''};
+  return {no:receiptNo(s),center:S.settings.centerName,cur:S.settings.currency,name:r.st.name,course:s.course||'',session:s.kind==='session',vip:s.vip?vipDur(s.minutes):'',start:s.start,end:s.end,months:s.months,fee:s.fee,paid:s.paid,remaining:s.remaining,pays:pays,today:todayStr(),addr:S.settings.address||'',phone:S.settings.phone||'',rnote:S.settings.receiptNote||'',photo:(RC.ph&&RC.ph.sid===r.st.id)?RC.ph.img:null,days:s.kind==='pack'?rcDays(s.id):[],pack:s.kind==='pack'?{total:(Number(s.sessionsTotal)||0)+(Number(s.sessionsAdjust)||0),left:s.left}:null,subjects:s.subjects||'',discount:Number(s.discount)||0,discountPct:s.discountPct||0,discountReason:s.discountReason||'',discountBy:s.discountBy||''};
 }
 function drawReceipt(m){
   var W=RC.W, SC=RC.SC, rows=Math.max(m.pays.length,1), daysH=(m.days&&m.days.length)?84+m.days.length*46:0, H=706+rows*58+440+(m.subjects?130:0)+daysH+((m.addr||m.phone||m.rnote)?80:0), dy=(m.subjects?130:0)+daysH;
@@ -4262,7 +4280,7 @@ function drawReceipt(m){
   if(m.photo){ var PS=112, px=M, py=219; c.save(); rr(px,py,PS,PS,16); c.clip(); var iw=m.photo.naturalWidth||m.photo.width, ih=m.photo.naturalHeight||m.photo.height, sq=Math.min(iw,ih); c.drawImage(m.photo,(iw-sq)/2,(ih-sq)/2,sq,sq,px,py,PS,PS); c.restore(); c.strokeStyle=GD; c.lineWidth=3; rr(px,py,PS,PS,16); c.stroke(); }
   cell(R,262,W-2*M-(m.photo?140:0),'الطالب',m.name,true); hl(345);
   cell(xr1,385,colW,'الدورة',m.course||'—');
-  cell(xr2,385,colW,'نوع الاشتراك',m.session?'حصة منفردة':m.pack?'باقة '+m.pack.total+' حصة':'اشتراك شهري ('+(m.months||1)+' شهر)');
+  cell(xr2,385,colW,'نوع الاشتراك',m.session?(m.vip?'حصة VIP · '+m.vip:'حصة منفردة'):m.pack?'باقة '+m.pack.total+' حصة':'اشتراك شهري ('+(m.months||1)+' شهر)');
   if(m.session){ cell(xr1,495,colW,'تاريخ الحصة',fmtDate(m.start)); }
   else if(m.pack){ cell(xr1,495,colW,'تاريخ البدء',fmtDate(m.start)); cell(xr2,495,colW,'الحصص المتبقية',m.pack.left+' من '+m.pack.total); }
   else { cell(xr1,495,colW,'تاريخ البدء',fmtDate(m.start)); cell(xr2,495,colW,'تاريخ الانتهاء',fmtDate(m.end)); }
@@ -4973,7 +4991,11 @@ function GRADE_NAMES(){ return window.NOON_GRADES||[]; }
 function fillGradeFilter(){
   var s=document.getElementById('stu-grade'); if(!s||s.options.length>1) return;
   GRADE_NAMES().forEach(function(n,i){ var o=document.createElement('option'); o.value=String(i+1); o.textContent=n; s.appendChild(o); });
+  var o2=document.createElement('option'); o2.value='other'; o2.textContent='أخرى (معهد، محاسبة…)'; s.appendChild(o2);
 }
+function vipDur(m){ m=Number(m)||60; return ({60:'ساعة',90:'ساعة ونصف',120:'ساعتان',150:'ساعتان ونصف',180:'ثلاث ساعات'})[m]||(m+' دقيقة'); }
+function gradeVal(v){ return v&&v!=='other'?Number(v):null; }
+function gradeText(st){ return st.grade?(GRADE_NAMES()[st.grade-1]||''):(st.gradeOther||''); }
 function planRows(grade,kind){ return (window.NOON_PRICES||[]).filter(function(p){ return Number(p.grade)===Number(grade)&&((kind==='session')===(p.plan==='session')); }).sort(function(a,b){ return (a.plan==='bag'?0:1)-(b.plan==='bag'?0:1)||a.subjects-b.subjects; }); }
 var SUBJ_WORD=['','مادة واحدة','مادتان','ثلاث مواد','أربع مواد','خمس مواد','ست مواد'];
 function planLabel(p){ return p.plan==='session'?'حصة واحدة':p.plan==='bag'?'حقيبة كاملة':(SUBJ_WORD[p.subjects]||(p.subjects+' مواد')); }
@@ -4986,12 +5008,13 @@ function planOptionsHtml(grade,kind){
 function planSelectHtml(pre,o){
   var k=o&&o.kind==='session'?'session':'month';
   return '<div class="field wide plan-only"><label for="'+pre+'-plan">الخطة (حسب قائمة الأسعار)</label><select id="'+pre+'-plan" data-f="plan" data-kind="'+k+'" data-grade="'+esc(o&&o.grade||'')+'">'+planOptionsHtml(o&&o.grade,k)+'</select></div>'+
-    '<div class="field wide session-only"><label for="'+pre+'-sgroup">يحضر مع مجموعة (اختياري)</label><select id="'+pre+'-sgroup" data-f="sgroup">'+sgroupOptionsHtml(o&&o.grade)+'</select><div class="hint" style="margin:4px 0 0">يظهر في قائمة هذه المجموعة في «حصص اليوم» في يوم الحصة فقط، دون أن يُسجَّل فيها.</div></div>';
+    '<div class="field wide session-only sg-field"><label for="'+pre+'-sgroup">يحضر مع مجموعة (اختياري)</label><select id="'+pre+'-sgroup" data-f="sgroup">'+sgroupOptionsHtml(o&&o.grade)+'</select><div class="hint" style="margin:4px 0 0">يظهر في قائمة هذه المجموعة في «حصص اليوم» في يوم الحصة فقط، دون أن يُسجَّل فيها.</div></div>';
 }
 document.addEventListener('change',function(e){
   var t=e.target; if(!t) return;
-  if(t.id==='fs-grade'){ var sel=document.querySelector('#f-student [data-f="plan"]'); if(sel){ sel.dataset.grade=t.value; sel.innerHTML=planOptionsHtml(t.value?Number(t.value):null,sel.dataset.kind); }
-    var sg=document.querySelector('#f-student [data-f="sgroup"]'); if(sg) sg.innerHTML=sgroupOptionsHtml(t.value?Number(t.value):null); }
+  if(t.id==='fs-grade'){ var sel=document.querySelector('#f-student [data-f="plan"]'); if(sel){ sel.dataset.grade=gradeVal(t.value)||''; sel.innerHTML=planOptionsHtml(gradeVal(t.value),sel.dataset.kind); }
+    var gw=document.getElementById('fs-go-wrap'); if(gw) gw.hidden=(t.value!=='other');
+    var sg=document.querySelector('#f-student [data-f="sgroup"]'); if(sg) sg.innerHTML=sgroupOptionsHtml(gradeVal(t.value)); }
   if(t.dataset&&t.dataset.f==='kind'){ var bx0=t.closest('.subfields'), ps=bx0&&bx0.querySelector('[data-f="plan"]'); if(ps){ var k0=t.value==='session'?'session':'month'; if(ps.dataset.kind!==k0){ ps.dataset.kind=k0; ps.innerHTML=planOptionsHtml(ps.dataset.grade?Number(ps.dataset.grade):null,k0); } } }
   if(t.dataset&&t.dataset.f==='plan'&&t.value!==''){
     var rows=planRows(t.dataset.grade,t.dataset.kind), p=rows[Number(t.value)]; if(!p) return;
@@ -5093,7 +5116,7 @@ function sessDefault(box){
 }
 document.addEventListener('change',function(e){
   var t=e.target; if(!t) return;
-  if(t.id==='fs-grade'){ var gl=document.querySelector('#f-student [data-grplist]'); if(gl){ gl.innerHTML=sessGroupsHtml(t.value?Number(t.value):null); var b=gl.closest('.subfields'); if(b) sessDefault(b); } }
+  if(t.id==='fs-grade'){ var gl=document.querySelector('#f-student [data-grplist]'); if(gl){ gl.innerHTML=sessGroupsHtml(gradeVal(t.value)); var b=gl.closest('.subfields'); if(b) sessDefault(b); } }
   if(t.matches&&t.matches('[data-grplist] input')){ var bx=t.closest('.subfields'); if(bx) sessDefault(bx); }
   if(t.dataset&&t.dataset.f==='kind'&&t.value==='pack'){ var bk=t.closest('.subfields'); if(bk) sessDefault(bk); }
 });
@@ -6579,6 +6602,34 @@ document.addEventListener('noon-inq-new',function(ev){ try{ var k=(ev.detail&&ev
       var r=D.byId[b.dataset.id]; if(r&&r.subs.some(function(x){ return x.kind!=='pack'&&x.kind!=='session'&&x.start<=TD.day&&TD.day<=x.end; })){ pl.className='pill info'; pl.textContent='حقيبة شهرية · للسجل فقط'; }
     });
   }catch(e){ if(window.console) console.error(e); } };
+})();
+
+/* ---- VIP session: toggle, gold button ---- */
+(function(){
+  function sync(box){
+    if(!box) return;
+    var v=box.querySelector('[data-f="vip"]'), on=!!(v&&v.checked&&box.dataset.kind==='session');
+    if(on) box.dataset.vip='1'; else delete box.dataset.vip;
+    if(on){
+      var sg=box.querySelector('[data-f="sgroup"]'); if(sg) sg.value='';
+      var c=box.querySelector('[data-f="course"]'); if(c&&(!c.value.trim()||c.value.trim()==='حصة منفردة')) c.value='حصة VIP';
+    }
+  }
+  document.addEventListener('change',function(e){
+    var t=e.target; if(!t||!t.dataset) return;
+    if(t.dataset.f==='vip'||t.dataset.f==='kind'){
+      var box=t.closest('.subfields'); if(!box) return;
+      if(t.dataset.f==='kind'&&t.value!=='session'){ var v=box.querySelector('[data-f="vip"]'); if(v) v.checked=false; }
+      sync(box);
+    }
+  },true);
+  document.addEventListener('click',function(e){
+    var b=e.target.closest&&e.target.closest('[data-vip="1"][data-act="panel"]'); if(!b) return;
+    setTimeout(function(){
+      var box=document.querySelector('#rn-box .subfields'); if(!box) return;
+      var v=box.querySelector('[data-f="vip"]'); if(v){ v.checked=true; sync(box); }
+    },60);
+  });
 })();
 
 
