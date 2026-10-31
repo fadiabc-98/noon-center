@@ -348,9 +348,9 @@ function requireLogin(){
 /* ---------- row <-> document mapping ---------- */
 var MAP={
   students:{path:'students',order:'created_at.asc,id.asc',
-    doc:function(r){ return {name:r.name,phone:r.phone,guardian:r.guardian,guardianPhone:r.guardian_phone,motherPhone:r.mother_phone||'',notes:r.notes,joined:r.joined||'',status:r.status||'active',grade:r.grade||null,gradeOther:r.grade_other||'',at:Date.parse(r.created_at)||0}; },
+    doc:function(r){ return {name:r.name,phone:r.phone,guardian:r.guardian,guardianPhone:r.guardian_phone,motherPhone:r.mother_phone||'',guardianOtherPhone:r.other_phone||'',notes:r.notes,joined:r.joined||'',status:r.status||'active',grade:r.grade||null,gradeOther:r.grade_other||'',at:Date.parse(r.created_at)||0}; },
     row:function(d,full){ var o={}; if(full||'name' in d) o.name=d.name; if(full||'phone' in d) o.phone=d.phone||''; if(full||'guardian' in d) o.guardian=d.guardian||'';
-      if(full||'guardianPhone' in d) o.guardian_phone=d.guardianPhone||''; if(full||'motherPhone' in d) o.mother_phone=d.motherPhone||''; if(full||'notes' in d) o.notes=d.notes||''; if(full||'joined' in d) o.joined=d.joined||null; if(full||'status' in d) o.status=d.status||'active'; if(full||'grade' in d) o.grade=d.grade?Number(d.grade):null; if(d.gradeOther||(!full&&'gradeOther' in d)) o.grade_other=String(d.gradeOther||'').slice(0,60); return o; }},
+      if(full||'guardianPhone' in d) o.guardian_phone=d.guardianPhone||''; if(full||'motherPhone' in d) o.mother_phone=d.motherPhone||''; if(d.guardianOtherPhone||(!full&&'guardianOtherPhone' in d)) o.other_phone=String(d.guardianOtherPhone||'').slice(0,40); if(full||'notes' in d) o.notes=d.notes||''; if(full||'joined' in d) o.joined=d.joined||null; if(full||'status' in d) o.status=d.status||'active'; if(full||'grade' in d) o.grade=d.grade?Number(d.grade):null; if(d.gradeOther||(!full&&'gradeOther' in d)) o.grade_other=String(d.gradeOther||'').slice(0,60); return o; }},
   subs:{path:'subscriptions',order:'created_at.asc,id.asc',
     doc:function(r){ var o={studentId:r.student_id,course:r.course,start:r.start_date,end:r.end_date,months:r.months,fee:Number(r.fee),at:Date.parse(r.created_at)||0}; if(r.due_on) o.dueOn=r.due_on; if(r.kind==='session') o.kind='session'; if(r.kind==='pack'){ o.kind='pack'; o.sessionsTotal=r.sessions_total; o.sessionsAdjust=r.sessions_adjust||0; } if(Number(r.discount)>0){ o.discount=Number(r.discount); o.discountPct=r.discount_pct==null?null:Number(r.discount_pct); o.discountReason=r.discount_reason||''; o.discountBy=r.discount_by||''; } if(r.teacher_id) o.teacherId=r.teacher_id; if(r.subjects) o.subjects=r.subjects; if(r.vip){ o.vip=true; if(r.minutes) o.minutes=r.minutes; } return o; },
     row:function(d,full){ var o={}; if(full||'studentId' in d) o.student_id=d.studentId; if(full||'course' in d) o.course=d.course; if(full||'start' in d) o.start_date=d.start;
@@ -689,7 +689,7 @@ function openImport(source,label){
 /* ---------- activity log page ---------- */
 var OPS={INSERT:'إضافة',UPDATE:'تعديل',DELETE:'حذف',EXPORT:'تصدير',IMPORT:'استيراد',RESTORE:'استعادة',LOGIN:'دخول',LOGOUT:'خروج',ADMIN:'إجراء إداري'};
 var SECS={students:'الطلاب',subscriptions:'الاشتراكات',payments:'الدفعات',attendance:'الحضور',settings:'الإعدادات',system:'النظام',accounts:'الحسابات',expenses:'المصروفات',employees:'الموظفون',employee_salaries:'رواتب الموظفين',advances:'السلف',salary_payments:'دفع الرواتب',teachers:'المعلمون',teacher_terms:'أجور المعلمين',teacher_payments:'دفعات المعلمين',inquiries:'الاستفسارات',groups:'المجموعات',price_list:'قائمة الأسعار',cash_closings:'إقفال الصندوق',subscription_groups:'مجموعات الباقة',session_marks:'حضور الحصص',group_off:'حصص مؤجلة',teacher_sessions:'حضور المعلمين',partners:'الشركاء',partner_draws:'سحوبات الشركاء',partner_settings:'إعدادات الشركاء',trash:'سلة المحذوفات'};
-var FIELDS={grade_other:'الصف (أخرى)',vip:'حصة VIP',minutes:'مدة الحصة (دقيقة)',name:'الاسم',phone:'الهاتف',guardian:'ولي الأمر',guardian_phone:'هاتف الأب',mother_phone:'هاتف الأم',notes:'ملاحظات',joined:'تاريخ الانضمام',course:'الدورة',start_date:'البداية',end_date:'النهاية',months:'الأشهر',fee:'الرسوم',kind:'النوع',amount:'المبلغ',paid_on:'تاريخ الدفع',note:'ملاحظة',mark:'العلامة',day:'اليوم',data:'الإعدادات',student_id:'الطالب',sub_id:'الاشتراك',category:'التصنيف',description:'البيان',on_date:'التاريخ',employee_id:'الموظف',period_start:'بداية الفترة',start_day:'يوم بداية الشهر',active:'يعمل',from_date:'يسري من',email:'البريد',role:'الصلاحية',status:'الحالة',method:'طريقة الدفع',discount:'الخصم',discount_pct:'نسبة الخصم',discount_reason:'سبب الخصم',discount_by:'بواسطة',subjects:'المواد',grade:'الصف',subject:'المادة',slots:'مواعيد الحصص',plan:'الخطة',price:'السعر',teacher_id:'المعلم',pay_type:'نوع الأجر',rate:'القيمة',interest:'الاهتمام',follow_up:'موعد المتابعة',created_by:'سجّله',sessions_total:'عدد الحصص',sessions_adjust:'تعديل الرصيد',group_id:'المجموعة',moved_to:'أُجّلت إلى',moved_t:'وقت التعويض',partner_id:'الشريك',drawn_on:'تاريخ السحب',reserve_pct:'الاحتياطي %'};
+var FIELDS={grade_other:'الصف (أخرى)',vip:'حصة VIP',minutes:'مدة الحصة (دقيقة)',name:'الاسم',phone:'الهاتف',guardian:'ولي الأمر',other_phone:'هاتف ولي الأمر (آخر)',guardian_phone:'هاتف الأب',mother_phone:'هاتف الأم',notes:'ملاحظات',joined:'تاريخ الانضمام',course:'الدورة',start_date:'البداية',end_date:'النهاية',months:'الأشهر',fee:'الرسوم',kind:'النوع',amount:'المبلغ',paid_on:'تاريخ الدفع',note:'ملاحظة',mark:'العلامة',day:'اليوم',data:'الإعدادات',student_id:'الطالب',sub_id:'الاشتراك',category:'التصنيف',description:'البيان',on_date:'التاريخ',employee_id:'الموظف',period_start:'بداية الفترة',start_day:'يوم بداية الشهر',active:'يعمل',from_date:'يسري من',email:'البريد',role:'الصلاحية',status:'الحالة',method:'طريقة الدفع',discount:'الخصم',discount_pct:'نسبة الخصم',discount_reason:'سبب الخصم',discount_by:'بواسطة',subjects:'المواد',grade:'الصف',subject:'المادة',slots:'مواعيد الحصص',plan:'الخطة',price:'السعر',teacher_id:'المعلم',pay_type:'نوع الأجر',rate:'القيمة',interest:'الاهتمام',follow_up:'موعد المتابعة',created_by:'سجّله',sessions_total:'عدد الحصص',sessions_adjust:'تعديل الرصيد',group_id:'المجموعة',moved_to:'أُجّلت إلى',moved_t:'وقت التعويض',partner_id:'الشريك',drawn_on:'تاريخ السحب',reserve_pct:'الاحتياطي %'};
 function studentName(id){ var s=cache.students.filter(function(x){return x.id===id;})[0]; return s?s.name:null; }
 function fieldVal(k,v){
   if(v==null||v==='') return '—';
@@ -3316,7 +3316,7 @@ function filteredRows(){
   var q=norm(S.q), f=S.filter;
   var list=D.rows.filter(function(r){
     if(q){
-      var hay=norm(r.st.name)+' '+norm(r.st.phone)+' '+norm(r.st.guardian)+' '+norm(r.st.guardianPhone)+' '+norm(r.st.motherPhone||'');
+      var hay=norm(r.st.name)+' '+norm(r.st.phone)+' '+norm(r.st.guardian)+' '+norm(r.st.guardianPhone)+' '+norm(r.st.motherPhone||'')+' '+norm(r.st.guardianOtherPhone||'');
       if(hay.indexOf(q)<0) return false;
     }
     if(S.gradeF&&(S.gradeF==='other'?(r.st.grade||!r.st.gradeOther):String(r.st.grade||'')!==S.gradeF)) return false;
@@ -3543,6 +3543,7 @@ function openStudentForm(id){
       '<div class="field"><label for="fs-guardian">ولي الأمر</label><input id="fs-guardian" maxlength="120" value="'+esc(st.guardian||'')+'"></div>'+
       '<div class="field"><label for="fs-gphone">هاتف الأب</label><input id="fs-gphone" class="ltr" inputmode="tel" value="'+esc(st.guardianPhone||'')+'"></div>'+
       '<div class="field"><label for="fs-mphone">هاتف الأم</label><input id="fs-mphone" class="ltr" inputmode="tel" value="'+esc(st.motherPhone||'')+'"></div>'+
+      '<div class="field wide"><label for="fs-ophone">هاتف ولي الأمر (إن لم يكن الأب أو الأم)</label><input id="fs-ophone" class="ltr" inputmode="tel" value="'+esc(st.guardianOtherPhone||'')+'"></div>'+
       '<div class="field wide"><label for="fs-notes">ملاحظات</label><input id="fs-notes" maxlength="300" value="'+esc(st.notes||'')+'"></div>'+
       (r?'<div class="field wide"><label for="fs-status">حالة الطالب</label><select id="fs-status"><option value="active"'+((st.status||'active')==='active'?' selected':'')+'>نشط</option><option value="paused"'+(st.status==='paused'?' selected':'')+'>موقوف مؤقتاً (لا تظهر له تنبيهات)</option><option value="withdrawn"'+(st.status==='withdrawn'?' selected':'')+'>منسحب (تبقى بياناته وسجل دفعاته)</option></select></div>':'')+
     '</div>'+
@@ -3563,6 +3564,8 @@ async function submitStudent(form){
   if(id&&$('#fs-status')) data.status=$('#fs-status').value;
   data.grade=gradeVal($('#fs-grade').value);
   if($('#fs-grade').value==='other'){ var go=($('#fs-go').value||'').trim(), pv=(id&&D.byId[id])?D.byId[id].st:{}; if(go||pv.gradeOther) data.gradeOther=go; } else if(id&&D.byId[id]&&D.byId[id].st.gradeOther) data.gradeOther='';
+  var _go=$('#fs-ophone'), _pv=(id&&D.byId[id])?D.byId[id].st:{};
+  if(_go){ var _gv=latinDigits(_go.value).trim(); if(_gv||_pv.guardianOtherPhone) data.guardianOtherPhone=_gv; }
   var sub=null;
   if(!id){
     sub=readSubFields(form.querySelector('fieldset'),false);
@@ -3647,6 +3650,7 @@ function renderDetail(){
   if(st.guardian) contacts.push('ولي الأمر: '+esc(st.guardian));
   if(st.guardianPhone) contacts.push('الأب: <bdi dir="ltr">'+esc(st.guardianPhone)+'</bdi>');
   if(st.motherPhone) contacts.push('الأم: <bdi dir="ltr">'+esc(st.motherPhone)+'</bdi>');
+  if(st.guardianOtherPhone) contacts.push('ولي الأمر'+(st.guardian?' ('+esc(st.guardian)+')':'')+': <bdi dir="ltr">'+esc(st.guardianOtherPhone)+'</bdi>');
   $('#d-head').innerHTML='<h2>'+esc(st.name)+(gradeText(st)?' <small class="muted">— '+esc(gradeText(st))+'</small>':'')+'</h2><div class="sub" style="margin-top:4px">'+statusPill(r.status)+(st.status==='paused'?' <span class="pill warn">موقوف مؤقتاً</span>':st.status==='withdrawn'?' <span class="pill crit">منسحب</span>':'')+' '+esc(r.status.course||'')+(r.status.pack&&r.status.sessLeft!=null?' · المتبقي '+r.status.sessLeft+' حصة':r.status.end?' · ينتهي '+fmtDate(r.status.end):'')+'</div>'+
     (contacts.length?'<div class="sub" style="margin-top:6px">'+contacts.join(' · ')+'</div>':'')+
     (st.notes?'<div class="sub" style="margin-top:4px">'+esc(st.notes)+'</div>':'')+
@@ -3910,7 +3914,7 @@ function validateBackup(o){
     var s=o.students[i];
     if(!s||!ID_RE.test(s.id||'')||!str(s.name,120).trim()||sIds[s.id]) return {error:'سجل طالب غير صالح في الملف (رقم '+(i+1)+').'};
     sIds[s.id]=1;
-    out.students.push({id:s.id,name:str(s.name,120).trim(),phone:str(s.phone,40),guardian:str(s.guardian,120),guardianPhone:str(s.guardianPhone,40),motherPhone:str(s.motherPhone,40),notes:str(s.notes,300),joined:isDate(s.joined)?s.joined:'',at:Number(s.at)||0});
+    out.students.push({id:s.id,name:str(s.name,120).trim(),phone:str(s.phone,40),guardian:str(s.guardian,120),guardianPhone:str(s.guardianPhone,40),motherPhone:str(s.motherPhone,40),guardianOtherPhone:str(s.guardianOtherPhone,40),notes:str(s.notes,300),joined:isDate(s.joined)?s.joined:'',at:Number(s.at)||0});
   }
   for(i=0;i<o.subs.length;i++){
     var u=o.subs[i], fee=Number(u&&u.fee), mo=parseInt(u&&u.months,10);
@@ -4112,7 +4116,7 @@ function renderAttDay(){
   var base=(q||S.attAll)?D.rows:expectedRows(d);
   var rows=base.filter(function(r){
     if(!q) return true;
-    return (norm(r.st.name)+' '+norm(r.st.phone)+' '+norm(r.st.guardian)+' '+norm(r.st.guardianPhone)+' '+norm(r.st.motherPhone||'')).indexOf(q)>=0;
+    return (norm(r.st.name)+' '+norm(r.st.phone)+' '+norm(r.st.guardian)+' '+norm(r.st.guardianPhone)+' '+norm(r.st.motherPhone||'')+' '+norm(r.st.guardianOtherPhone||'')).indexOf(q)>=0;
   }).sort(function(a,b){ return a.st.name.localeCompare(b.st.name,'ar'); });
 
   var exp=expectedRows(d);
@@ -4228,7 +4232,7 @@ document.addEventListener('keydown',function(e){
   e.preventDefault();
   var d=S.attDate; if(d>todayStr()) return;
   var q=norm(S.attQ); if(!q) return;
-  var hits=D.rows.filter(function(r){ return (norm(r.st.name)+' '+norm(r.st.phone)+' '+norm(r.st.guardian)+' '+norm(r.st.guardianPhone)+' '+norm(r.st.motherPhone||'')).indexOf(q)>=0; });
+  var hits=D.rows.filter(function(r){ return (norm(r.st.name)+' '+norm(r.st.phone)+' '+norm(r.st.guardian)+' '+norm(r.st.guardianPhone)+' '+norm(r.st.motherPhone||'')+' '+norm(r.st.guardianOtherPhone||'')).indexOf(q)>=0; });
   if(hits.length!==1){ toast(hits.length?'اكتب جزءاً أكثر من الاسم ليبقى طالب واحد':'لا توجد نتائج مطابقة'); return; }
   if(markOf(d,hits[0].st.id)!=='p') attMark(hits[0].st.id,'p');
   S.attQ=''; e.target.value=''; renderAttDay(); e.target.focus();
@@ -4791,7 +4795,7 @@ function waTargets(r,studentFirst){
   var st=r.st, out=[], seen={};
   function add(l,raw){ var p=toIntl(raw||''); if(p&&!seen[p]){ seen[p]=1; out.push({l:l,p:p,raw:String(raw).trim()}); } }
   if(studentFirst&&st.phone){ add('الطالب',st.phone); return out; }
-  add('الأب',st.guardianPhone); add('الأم',st.motherPhone);
+  add('الأب',st.guardianPhone); add('الأم',st.motherPhone); add('ولي الأمر',st.guardianOtherPhone);
   if(!out.length) add('الطالب',st.phone);
   return out;
 }
@@ -5869,7 +5873,7 @@ function ppWaText(g,o){
   return L.join('\n');
 }
 function ppWaPhone(r){ var t=waTargets(r,true); return t.length?t[0].p:''; }
-function parentsTxt(st){ return [st.guardianPhone,st.motherPhone].filter(function(x){ return x&&String(x).trim(); }).join(' / '); }
+function parentsTxt(st){ return [st.guardianPhone,st.motherPhone,st.guardianOtherPhone].filter(function(x){ return x&&String(x).trim(); }).join(' / '); }
 function openPpWa(gid){
   var g=(window.NOON_GROUPS||[]).filter(function(x){ return x.id===gid; })[0]; if(!g) return;
   var o=(window.NOON_OFF||[]).filter(function(x){ return x.group_id===gid&&x.day===TD.day; })[0]; if(!o) return;
@@ -6063,7 +6067,7 @@ function decoAlertsDue(){
 }
 
 /* ---- 4) siblings: students who share the guardian's phone number ---- */
-function famKeys(st){ return [toIntl((st&&st.guardianPhone)||''),toIntl((st&&st.motherPhone)||'')].filter(Boolean); }
+function famKeys(st){ return [toIntl((st&&st.guardianPhone)||''),toIntl((st&&st.motherPhone)||''),toIntl((st&&st.guardianOtherPhone)||'')].filter(Boolean); }
 function famKey(st){ return famKeys(st)[0]||''; }
 function famShare(ks,st){ var o=famKeys(st); return ks.some(function(k){ return o.indexOf(k)>=0; }); }
 function siblingsOf(r){ var ks=famKeys(r.st); if(!ks.length) return []; return D.rows.filter(function(x){ return x!==r&&x.st.status!=='withdrawn'&&famShare(ks,x.st); }); }
@@ -6104,8 +6108,8 @@ function sibHint(){
   var pct=Number(S.settings&&S.settings.siblingPct)||0;
   document.querySelectorAll('#overlay [data-f="dtype"]').forEach(function(dt){
     var box=dt.closest('.subfields')||dt.closest('form'); if(!box) return;
-    var gp=document.getElementById('fs-gphone'), mp=document.getElementById('fs-mphone'), ks=[], self=null;
-    if(gp&&box.closest('form')&&box.closest('form').contains(gp)) ks=famKeys({guardianPhone:gp.value,motherPhone:mp?mp.value:''});
+    var gp=document.getElementById('fs-gphone'), mp=document.getElementById('fs-mphone'), op=document.getElementById('fs-ophone'), ks=[], self=null;
+    if(gp&&box.closest('form')&&box.closest('form').contains(gp)) ks=famKeys({guardianPhone:gp.value,motherPhone:mp?mp.value:'',guardianOtherPhone:op?op.value:''});
     else if(S.detailId&&D.byId[S.detailId]){ self=D.byId[S.detailId]; ks=famKeys(self.st); }
     var n=ks.length?D.rows.filter(function(x){ return x!==self&&x.st.status!=='withdrawn'&&famShare(ks,x.st); }).length:0;
     var old=box.querySelector('.th-sib');
