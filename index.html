@@ -947,7 +947,7 @@ window.NOON_CLASHGATE=clashGate;
 window.NOON_SESSIONS_ON=sessionsOn;
 function openTimetable(){
   var owner=window.CLOUD.role==='owner';
-  var sh=modalShell('الجدول والأسعار',true,'noon-nav-tt'), bd=sh.bd, tab='week', gf='', msg='', msgCls='', editing=null, c=cur();
+  var sh=modalShell('الجدول والأسعار',true,'noon-nav-tt'), bd=sh.bd, tab='week', gf='', qv='', msg='', msgCls='', editing=null, c=cur();
   var G=window.NOON_GRADES, DAYS=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'], ORDER=[6,0,1,2,3,4,5];
   function endOf(t,m){ var x=(+t.slice(0,2))*60+(+t.slice(3,5))+Number(m); x=x%1440; return ('0'+Math.floor(x/60)).slice(-2)+':'+('0'+(x%60)).slice(-2); }
   function tname(id){ var t=(window.NOON_TEACHERS||[]).filter(function(x){return x.id===id;})[0]; return t?t.name:''; }
@@ -964,7 +964,7 @@ function openTimetable(){
   }
   function renderWeek(body){
     var td=new Date().getDay(), list=(window.NOON_GROUPS||[]).filter(function(g){ return g.active&&(!gf||String(g.grade)===gf); });
-    var html='<div class="filters frm"><label>الصف<select id="tt-gf">'+gradeOpts(gf,true)+'</select></label></div>';
+    var html='<div class="filters frm"><label>الصف<select id="tt-gf">'+gradeOpts(gf,true)+'</select></label><label class="grow">بحث سريع<input id="tt-q" type="search" autocomplete="off" placeholder="اكتب المادة أو الصف أو المعلم… مثال: رياضيات" value="'+esc(qv)+'"></label><button class="btn sm" type="button" id="tt-print">طباعة الجدول</button></div><div id="tt-res"></div><div id="tt-days">';
     var any=false;
     ORDER.slice().sort(function(a,b){ return (a===td?-1:0)-(b===td?-1:0); }).forEach(function(d){
       var items=[]; list.forEach(function(g){ (g.slots||[]).forEach(function(s){ if(s.d===d) items.push({g:g,s:s}); }); });
@@ -973,8 +973,34 @@ function openTimetable(){
         (items.length?items.map(function(x){ return '<div class="slot"><b dir="ltr">'+x.s.t+'–'+endOf(x.s.t,x.s.m)+'</b><span><b>'+esc(gname(x.g.grade))+'</b> — '+esc(x.g.subject)+'</span><small>'+(tname(x.g.teacher_id)?esc(tname(x.g.teacher_id))+' · ':'')+x.s.m+' دقيقة</small></div>'; }).join(''):'<div class="sub">لا حصص.</div>')+'</div>';
     });
     if(!any) html+='<div class="empty">'+(owner?'لم تُضف مجموعات بعد. افتح تبويب «المجموعات» وأضف أول مجموعة.':'لم يُدخل المالك جدول الحصص بعد.')+'</div>';
-    body.innerHTML=html;
+    body.innerHTML=html+'</div>';
     body.querySelector('#tt-gf').onchange=function(){ gf=this.value; render(); };
+    var qi=body.querySelector('#tt-q'), res=body.querySelector('#tt-res'), days=body.querySelector('#tt-days');
+    function nz(x){ return String(x||'').replace(/[\u064B-\u0652\u0640]/g,'').replace(/[إأآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').toLowerCase().trim(); }
+    function srt(g){ return (g.slots||[]).slice().sort(function(a,b){ return ORDER.indexOf(a.d)-ORDER.indexOf(b.d)||a.t.localeCompare(b.t); }); }
+    function lines(g){ return srt(g).map(function(sl){ return DAYS[sl.d]+' '+sl.t+'–'+endOf(sl.t,sl.m); }); }
+    function search(){
+      qv=qi.value; var terms=nz(qv).split(/\s+/).filter(function(x){ return x&&x!=='الصف'&&x!=='صف'; });
+      if(!terms.length){ res.innerHTML=''; days.hidden=false; return; }
+      days.hidden=true;
+      var found=list.filter(function(g){ var hay=nz(gname(g.grade)+' '+g.subject+' '+tname(g.teacher_id)+' '+(g.note||'')); return terms.every(function(t){ return hay.indexOf(t)>=0; }); });
+      if(!found.length){ res.innerHTML='<div class="empty">لا توجد مجموعة فعّالة بهذا الاسم.</div>'; return; }
+      res.innerHTML='<div class="row"><button class="btn sm" type="button" id="tt-copy">نسخ للواتساب</button></div>'+found.map(function(g){
+        return '<div class="slot"><span><b>'+esc(gname(g.grade))+'</b> — '+esc(g.subject)+'</span><small>'+(tname(g.teacher_id)?esc(tname(g.teacher_id))+' · ':'')+'</small><div>'+(lines(g).map(function(l){ return '<div dir="rtl"><b>'+esc(l)+'</b></div>'; }).join('')||'<span class="sub">لا مواعيد مسجّلة</span>')+'</div></div>'; }).join('');
+      res.querySelector('#tt-copy').onclick=function(){
+        var txt=found.map(function(g){ return gname(g.grade)+' — '+g.subject+(tname(g.teacher_id)?' ('+tname(g.teacher_id)+')':'')+':\n'+(lines(g).join('\n')||'—'); }).join('\n\n');
+        try{ navigator.clipboard.writeText(txt).then(function(){ say('تم النسخ، الصقه في واتساب.','ok'); },function(){ say('تعذّر النسخ.','bad'); }); }catch(e){ say('تعذّر النسخ.','bad'); }
+      };
+    }
+    qi.oninput=search; if(qv) search();
+    body.querySelector('#tt-print').onclick=function(){
+      var times={}, used={}; list.forEach(function(g){ (g.slots||[]).forEach(function(sl){ times[sl.t]=1; used[sl.d]=1; }); });
+      var ds=ORDER.filter(function(d){ return used[d]; }), ts=Object.keys(times).sort();
+      if(!ds.length){ say('لا جدول للطباعة.','bad'); return; }
+      var th='<tr><th>الوقت</th>'+ds.map(function(d){ return '<th>'+DAYS[d]+'</th>'; }).join('')+'</tr>';
+      var rows=ts.map(function(t){ return '<tr><td dir="ltr"><b>'+t+'</b></td>'+ds.map(function(d){ var cell=[]; list.forEach(function(g){ (g.slots||[]).forEach(function(sl){ if(sl.d===d&&sl.t===t) cell.push('<div><b>'+esc(g.subject)+'</b> — '+esc(gname(g.grade))+(tname(g.teacher_id)?'<br><small>'+esc(tname(g.teacher_id))+'</small>':'')+'</div>'); }); }); return '<td>'+cell.join('')+'</td>'; }).join('')+'</tr>'; }).join('');
+      if(window.NOON_PRINT) window.NOON_PRINT('الجدول الأسبوعي'+(gf?' — '+gname(Number(gf)):''),'<table>'+th+rows+'</table>',true);
+    };
   }
   function slotRow(s){ return '<div class="gs-row"><select class="gs-d">'+DAYS.map(function(n,i){ return '<option value="'+i+'"'+(s&&s.d===i?' selected':'')+'>'+n+'</option>'; }).join('')+'</select><input class="gs-t" data-fmt="time" inputmode="numeric" maxlength="5" placeholder="16:00" dir="ltr" autocomplete="off" value="'+esc(s?s.t:'')+'"><input class="gs-m" data-fmt="num" inputmode="numeric" maxlength="3" placeholder="دقيقة" dir="ltr" autocomplete="off" value="'+esc(s?s.m:'90')+'"><button type="button" class="btn sm gs-x">×</button></div>'; }
   function renderGroups(body){
@@ -5916,6 +5942,7 @@ function shCss(land){
     '.off{background:#EEE!important;color:#888}.tot td{font-weight:800;background:#F3EEDD!important}.small{font-size:11px;color:#66736E}.bad{color:#C2362C;font-weight:700}.foot{margin-top:10px;font-size:11px;color:#66736E}'+
     '.att th,.att td{padding:3px 2px;font-size:11px}.att td:first-child,.att th:first-child{text-align:right;padding-inline:6px;white-space:nowrap}';
 }
+window.NOON_PRINT=function(a,b,c){ return printSheet(a,b,c); };
 function printSheet(title,body,land){
   var st=S.settings||{}, html='<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>'+esc(title)+'</title>'+
     '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800&family=Tajawal:wght@400;500;700;800&display=swap"><style>'+shCss(land)+'</style></head><body>'+
