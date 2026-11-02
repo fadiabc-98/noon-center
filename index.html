@@ -3727,10 +3727,11 @@ function showPanel(name,subId,kind){
     var monthly=r.subs.filter(function(s){return s.kind!=='session'&&s.kind!=='pack';});
     var last=monthly[0];
     var lastEnd=monthly.reduce(function(m,s){return s.end>m?s.end:m;},'');
-    var start=ses?today:(lastEnd&&lastEnd>=today?addDays(lastEnd,1):today);
+    var start=ses?today:(lastEnd&&(lastEnd>=today||(!pk&&lastEnd>=addDays(today,-31)))?addDays(lastEnd,1):today);
     var mo=last?(last.months||1):1;
-    $('#rn-box').innerHTML=subFieldsHtml('rn',{grade:r.st.grade||null,kind:ses?'session':pk?'pack':'month',course:last?last.course:'',start:start,months:mo,end:subEnd(start,mo),grade:r.st.grade,fee:(!ses&&!pk&&last)?r3((Number(last.fee)||0)+(Number(last.discount)||0)):'',teacher:last?last.teacherId:'',subjects:last?(last.subjects||''):''});
+    $('#rn-box').innerHTML=subFieldsHtml('rn',{grade:r.st.grade||null,kind:ses?'session':pk?'pack':'month',course:last?last.course:'',subjects:(!ses&&!pk&&last)?(last.subjects||''):'',teacher:(!ses&&!pk&&last)?(last.teacherId||''):'',start:start,months:mo,end:subEnd(start,mo),grade:r.st.grade,fee:(!ses&&!pk&&last)?r3((Number(last.fee)||0)+(Number(last.discount)||0)):'',teacher:last?last.teacherId:'',subjects:last?(last.subjects||''):''});
     $('#rn-err').textContent='';
+    if(last&&!ses&&!pk) $('#rn-box').insertAdjacentHTML('afterbegin','<p class="hint">نُسخت بيانات الاشتراك السابق (الدورة والمواد والمعلم والرسوم) وتبدأ المدة من اليوم التالي لانتهائه. عدّل ما تريد قبل الحفظ؛ الاشتراك السابق وسجلّه لا يتغيران.</p>');
     if(last&&!ses) $('#rn-box [data-f="fee"]').dataset.touched='1';
     if(ses) autoFee($('#rn-box .subfields'));
   }else if(name==='remind'){
