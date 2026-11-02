@@ -1585,11 +1585,20 @@ function openMoney(){
     body.innerHTML='جارٍ التحميل…'; var c=cur(), m0=month+'-01', dues;
     var tsRows=[];
     try{ dues=await rpc('teacher_dues',{p_month:m0}); var mr=monthRange(month); tsRows=await fetchAll('/rest/v1/teacher_sessions?select=*&day=gte.'+mr[0]+'&day=lte.'+mr[1]+'&order=day.asc'); }catch(e){ body.innerHTML='<div class="bad">'+esc(adminErr(e))+'</div>'; return; }
+    var older={};
+    try{
+      var ms=[], yy=+month.slice(0,4), mo2=+month.slice(5,7);
+      for(var i=1;i<=12;i++){ mo2--; if(mo2<1){ mo2=12; yy--; } ms.push(yy+'-'+('0'+mo2).slice(-2)); }
+      var rs=await Promise.all(ms.map(function(mm){ return rpc('teacher_dues',{p_month:mm+'-01'}).then(function(r){ return {m:mm,r:r}; },function(){ return {m:mm,r:[]}; }); }));
+      rs.forEach(function(o){ (o.r||[]).forEach(function(x){ if(Number(x.remaining)>0.004) (older[x.teacher_id]=older[x.teacher_id]||[]).push({m:o.m,ps:x.period_start,rem:Number(x.remaining)}); }); });
+      Object.keys(older).forEach(function(k){ older[k].sort(function(a,b){ return a.ps<b.ps?-1:a.ps>b.ps?1:0; }); });
+    }catch(e0){ older={}; }
+    var olderSum=function(id){ return (older[id]||[]).reduce(function(a,o){ return a+o.rem; },0); };
     var tn=function(id){ var t=D.teachers.filter(function(x){return x.id===id;})[0]; return t?t.name:'(معلم)'; };
     var html=monthPicker()+'<div class="row" style="margin:0 0 10px"><button class="btn sm primary" type="button" id="th-new">إضافة معلم</button></div><div id="th-form"></div>'+
       '<p class="sub" style="margin-top:0">المستحق للمعلم: نسبة من المبالغ التي دفعها طلاب اشتراكاته خلال الشهر، أو مبلغ ثابت شهري، أو مبلغ لكل حصة (يُحسب من حضوره المسجَّل في «حصص اليوم»). اربط كل اشتراك بمعلمه عند تسجيل الاشتراك. تُحسب النسبة على ما دُفع فعلاً (بعد الخصم).</p>'+
-      '<table class="imp"><thead><tr><th>المعلم</th><th>الأجر</th><th>محصّل من طلابه / عدد الحصص</th><th>المستحق</th><th>المدفوع</th><th>المتبقي</th><th></th></tr></thead><tbody>'+
-      (dues.length?dues.map(function(x){ return '<tr data-id="'+esc(x.teacher_id)+'"><td><b>'+esc(x.name)+'</b>'+(x.active?'':' <small>(متوقف)</small>')+(x.period_start&&x.period_start.slice(8)!=='01'?'<div class="sub" dir="ltr">'+esc(dmy(x.period_start))+' ← '+esc(dmy(x.period_end))+'</div>':'')+'</td><td>'+(x.pay_type==='percent'?n2(x.rate)+'%':(x.pay_type==='fixed'?'ثابت '+n2(x.rate):(x.pay_type==='none'?'بدون راتب':x.pay_type==='session'?n2(x.rate)+' للحصة':'<span class="bad">غير محدد</span>')))+'</td><td class="n">'+(x.pay_type==='percent'?n2(x.base):(x.pay_type==='session'?n2(x.base)+' حصة':'—'))+'</td><td class="n">'+n2(x.due)+'</td><td class="n t-ok">'+n2(x.paid)+'</td><td class="n '+(Number(x.remaining)>0?'warn':'')+'"><b>'+n2(x.remaining)+'</b></td><td class="nw"><button class="btn sm primary th-pay" type="button"'+(Number(x.remaining)>0?'':' disabled')+'>دفع</button> <button class="btn sm th-bonus" type="button">إكرامية</button> <button class="btn sm th-edit" type="button">تعديل</button> <button class="btn sm danger th-del" type="button">حذف</button></td></tr>'; }).join(''):'<tr><td colspan="7" class="empty">لا يوجد معلمون بعد.</td></tr>')+'</tbody></table>'+
+      '<table class="imp"><thead><tr><th>المعلم</th><th>الأجر</th><th>محصّل من طلابه / عدد الحصص</th><th>المستحق</th><th>المدفوع</th><th>المتبقي</th><th>متراكم من أشهر سابقة</th><th></th></tr></thead><tbody>'+
+      (dues.length?dues.map(function(x){ return '<tr data-id="'+esc(x.teacher_id)+'"><td><b>'+esc(x.name)+'</b>'+(x.active?'':' <small>(متوقف)</small>')+(x.period_start&&x.period_start.slice(8)!=='01'?'<div class="sub" dir="ltr">'+esc(dmy(x.period_start))+' ← '+esc(dmy(x.period_end))+'</div>':'')+'</td><td>'+(x.pay_type==='percent'?n2(x.rate)+'%':(x.pay_type==='fixed'?'ثابت '+n2(x.rate):(x.pay_type==='none'?'بدون راتب':x.pay_type==='session'?n2(x.rate)+' للحصة':'<span class="bad">غير محدد</span>')))+'</td><td class="n">'+(x.pay_type==='percent'?n2(x.base):(x.pay_type==='session'?n2(x.base)+' حصة':'—'))+'</td><td class="n">'+n2(x.due)+'</td><td class="n t-ok">'+n2(x.paid)+'</td><td class="n '+(Number(x.remaining)>0?'warn':'')+'"><b>'+n2(x.remaining)+'</b></td>'+(older[x.teacher_id]?'<td class="n warn"><b>'+n2(olderSum(x.teacher_id))+'</b>'+older[x.teacher_id].map(function(o){ return '<div class="sub" dir="rtl">'+esc(o.m)+': '+n2(o.rem)+'</div>'; }).join('')+'<div class="sub"><b>الإجمالي: '+n2(olderSum(x.teacher_id)+Math.max(0,Number(x.remaining)))+'</b></div></td>':'<td class="n">—</td>')+'<td class="nw">'+(older[x.teacher_id]?'<button class="btn sm primary th-payall" type="button">دفع الأقدم أولاً</button> ':'')+'<button class="btn sm primary th-pay" type="button"'+(Number(x.remaining)>0?'':' disabled')+'>دفع</button> <button class="btn sm th-bonus" type="button">إكرامية</button> <button class="btn sm th-edit" type="button">تعديل</button> <button class="btn sm danger th-del" type="button">حذف</button></td></tr>'; }).join(''):'<tr><td colspan="8" class="empty">لا يوجد معلمون بعد.</td></tr>')+'</tbody></table>'+
       '<h3 class="sec">دفعات هذا الشهر</h3><table class="imp"><tbody>'+
       (function(){ var a=monthRange(month), l=D.tpays.filter(function(x){return inRange(x.paid_on,a[0],a[1]);}); return l.length?l.map(function(x){ return '<tr><td dir="ltr">'+esc(dmy(x.paid_on))+'</td><td>'+esc(tn(x.teacher_id))+(x.kind==='bonus'?' <span class="pill ok">إكرامية</span>':'')+'</td><td class="n">'+n2(x.amount)+'</td><td>'+esc(x.note||'')+'</td><td><button class="btn sm th-rm" data-id="'+esc(x.id)+'" type="button">حذف</button></td></tr>'; }).join(''):'<tr><td class="empty">لا دفعات.</td></tr>'; })()+'</tbody></table>';
     var attHtml=(function(){
@@ -1645,6 +1654,24 @@ function openMoney(){
           async function(f,sid){ var a=Number(f.a.value); if(!(a>0)||!okDate(f.d.value)) throw lerr('أدخل مبلغاً وتاريخاً صحيحين.');
             if(a>Number(d.remaining)&&!confirm('المبلغ أكبر من المتبقي ('+n2(d.remaining)+'). متابعة؟')) throw lerr('لم يُسجَّل الدفع.');
             try{ await w('POST','/rest/v1/teacher_payments',{id:sid,teacher_id:t.id,period_start:(d.period_start||m0),amount:a,paid_on:f.d.value,note:f.n.value.trim()}); }catch(er){ if(er.code!=='23505') throw er; } },'سُجّل دفع المعلم.');
+        box.scrollIntoView({block:'nearest'}); };
+      var pa=tr.querySelector('.th-payall');
+      if(pa) pa.onclick=function(){
+        var o=older[t.id]||[], tot=olderSum(t.id)+Math.max(0,Number(d.remaining));
+        frm(box,'<label>المعلم<input disabled value="'+esc(t.name)+'"></label><label>إجمالي المتبقي (كل الفترات)<input disabled dir="ltr" value="'+esc(tot)+'"></label><label>المبلغ<input name="a" data-fmt="num" inputmode="decimal" autocomplete="off" required dir="ltr" value="'+esc(tot)+'"></label><label>تاريخ الدفع<input name="d" data-fmt="date" inputmode="numeric" maxlength="10" autocomplete="off" dir="ltr" required value="'+esc(today())+'"></label><label class="grow">ملاحظة<input name="n" maxlength="200"></label><div class="sub" style="flex-basis:100%">يُوزَّع المبلغ على الفترات من الأقدم إلى الأحدث، ويُسجَّل لكل فترة دفع مستقل.</div>',
+          async function(f,sid){
+            var a=Number(f.a.value); if(!(a>0)||!okDate(f.d.value)) throw lerr('أدخل مبلغاً وتاريخاً صحيحين.');
+            if(a>tot+0.004&&!confirm('المبلغ أكبر من إجمالي المتبقي ('+n2(tot)+'). متابعة؟')) throw lerr('لم يُسجَّل الدفع.');
+            var parts=o.map(function(x){ return {ps:x.ps,rem:x.rem}; });
+            if(Number(d.remaining)>0) parts.push({ps:(d.period_start||m0),rem:Number(d.remaining)});
+            var left=a, plan=[];
+            parts.forEach(function(x){ if(left<=0.004) return; var v=Math.min(left,x.rem); plan.push({ps:x.ps,v:Math.round(v*100)/100}); left=Math.round((left-v)*100)/100; });
+            if(left>0.004) plan.push({ps:(d.period_start||m0),v:left});
+            for(var k=0;k<plan.length;k++){
+              var pid=k===0?sid:uuid();
+              try{ await w('POST','/rest/v1/teacher_payments',{id:pid,teacher_id:t.id,period_start:plan[k].ps,amount:plan[k].v,paid_on:f.d.value,note:f.n.value.trim()}); }catch(er){ if(er.code!=='23505') throw er; }
+            }
+          },'سُجّل الدفع وتوزّع على الفترات من الأقدم.');
         box.scrollIntoView({block:'nearest'}); };
       tr.querySelector('.th-bonus').onclick=function(){
         frm(box,'<label>المعلم<input disabled value="'+esc(t.name)+'"></label><label>مبلغ الإكرامية<input name="a" data-fmt="num" inputmode="decimal" autocomplete="off" required dir="ltr"></label><label>التاريخ<input name="d" data-fmt="date" inputmode="numeric" maxlength="10" autocomplete="off" dir="ltr" required value="'+esc(today())+'"></label><label>دُفعت من<select name="s"><option value="safe">الخزينة</option><option value="drawer">الدرج</option><option value="bank">المصرف</option></select></label><label class="grow">ملاحظة<input name="n" maxlength="200" placeholder="مثال: إكرامية نهاية الشهر"></label><p class="sub" style="flex-basis:100%;margin:0">الإكرامية زيادة على الأجر: لا تُنقص المتبقي له، وتُحسب ضمن المصروفات وقبل نصيب الشركاء.</p>',
