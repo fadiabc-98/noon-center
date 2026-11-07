@@ -1338,8 +1338,8 @@ function openMoney(){
     if(!t.started){ body.innerHTML=trSetupHtml(t,false); fmtInputs(body); trBindSetup(body,t,false); return; }
     var mr=monthRange(trMonth), led=[];
     try{ led=await rpc('treasury_ledger',{p_box:trBox,p_from:mr[0],p_to:mr[1]})||[]; }catch(e){ say(adminErr(e),'bad'); }
-    var bal=0, rows=led.map(function(x){ var a=Number(x.amount); if(x.kind==='carry'){ bal=a; return '<tr class="sub"><td dir="ltr">'+esc(dmy(mr[0]))+'</td><td>'+esc(x.label)+'</td><td></td><td></td><td class="n"><b>'+n2(bal)+'</b></td></tr>'; }
-      bal+=a; return '<tr><td dir="ltr">'+esc(dmy(x.day))+'</td><td>'+esc(x.label)+'</td><td class="n t-ok">'+(a>0?n2(a):'')+'</td><td class="n bad">'+(a<0?n2(-a):'')+'</td><td class="n">'+n2(bal)+'</td></tr>'; });
+    var bal=0, rows=led.map(function(x){ var a=Number(x.amount); if(x.kind==='carry'){ bal=a; return '<tr class="sub"><td dir="ltr">'+esc(dmy(mr[0]))+'</td><td>'+esc(x.label)+'</td><td></td><td></td><td class="n"><b>'+n2(bal)+'</b></td><td></td></tr>'; }
+      bal+=a; return '<tr><td dir="ltr">'+esc(dmy(x.day))+'</td><td>'+esc(x.label)+'</td><td class="n t-ok">'+(a>0?n2(a):'')+'</td><td class="n bad">'+(a<0?n2(-a):'')+'</td><td class="n">'+n2(bal)+'</td><td class="nw">'+((x.kind==='transfer'||x.kind==='deposit')&&x.ref?'<button class="btn sm tm-rm" type="button" data-id="'+esc(x.ref)+'" data-k="'+esc(x.kind)+'">حذف</button>':'')+'</td></tr>'; });
     var forms='';
     if(trForm==='count') forms='<div class="pwbox"><b>جرد</b><p class="sub">عُدّ النقود الموجودة فعلاً واكتبها. إن اختلفت عن الرصيد المحسوب يُسجَّل الفرق بتاريخ اليوم ويُصحَّح الرصيد.</p><form id="tc-f" class="filters frm"><label>الصندوق<select id="tc-b"><option value="safe">الخزينة</option><option value="bank">المصرف</option></select></label><label>المبلغ الموجود فعلاً ('+esc(c)+')<input id="tc-v" data-fmt="num" inputmode="decimal" dir="ltr" autocomplete="off"></label><label class="grow">ملاحظة<input id="tc-n" maxlength="200"></label><button class="btn sm primary" type="submit">تسجيل الجرد</button><button class="btn sm" type="button" id="tc-x">إلغاء</button></form><div id="tc-d" class="sub"></div></div>';
     if(trForm==='dep') forms='<div class="pwbox"><b>إيداع مال</b><p class="sub">لإدخال مال جاء من خارج دفعات الطلاب (مثل مال قديم أو مبلغ من حساب سابق). يزيد رصيد الصندوق المختار، ويدخل في حساب أنصبة الشركاء، ولا يُحسب كدفعة طالب ولا في دخل الشهر. للمالك فقط. لا تستعمله لدفعات الطلاب؛ سجّلها في ملف الطالب.</p><form id="td-f" class="filters frm"><label>إلى<select id="td-b"><option value="safe">الخزينة</option><option value="bank">المصرف</option></select></label><label>المبلغ ('+esc(c)+')<input id="td-v" data-fmt="num" inputmode="decimal" dir="ltr" autocomplete="off"></label><label>التاريخ<input id="td-d" data-fmt="date" inputmode="numeric" maxlength="10" dir="ltr" autocomplete="off" value="'+esc(today())+'"></label><label class="grow">البيان<input id="td-n" maxlength="200" placeholder="مثال: مال قديم من الحساب السابق"></label><button class="btn sm primary" type="submit">تسجيل الإيداع</button><button class="btn sm" type="button" id="td-x">إلغاء</button></form></div>';
@@ -1349,13 +1349,17 @@ function openMoney(){
       '<div class="row wrap" style="margin-bottom:8px"><button class="btn sm primary" type="button" id="tr-count">جرد الخزينة</button><button class="btn sm" type="button" id="tr-move">تحويل بين الأرصدة</button><button class="btn sm" type="button" id="tr-dep">إيداع مال</button><button class="btn sm" type="button" id="tr-set">إعدادات الخزينة</button></div>'+
       (trForm==='set'?trSetupHtml(t,true):forms)+
       '<h3 class="sec">الحركة</h3><div class="filters frm"><label>الصندوق<select id="tr-box"><option value="safe"'+(trBox==='safe'?' selected':'')+'>الخزينة</option><option value="bank"'+(trBox==='bank'?' selected':'')+'>المصرف</option><option value="drawer"'+(trBox==='drawer'?' selected':'')+'>الدرج</option></select></label><label class="mp">الشهر <input data-fmt="month" inputmode="numeric" maxlength="7" dir="ltr" id="tr-m" value="'+esc(trMonth)+'"></label></div>'+
-      '<table class="imp"><thead><tr><th>اليوم</th><th>البيان</th><th>داخل</th><th>خارج</th><th>الرصيد</th></tr></thead><tbody>'+(rows.length>1?rows.join(''):(rows.join('')+'<tr><td colspan="5" class="empty">لا حركة في هذا الشهر.</td></tr>'))+'</tbody></table>';
+      '<table class="imp"><thead><tr><th>اليوم</th><th>البيان</th><th>داخل</th><th>خارج</th><th>الرصيد</th><th></th></tr></thead><tbody>'+(rows.length>1?rows.join(''):(rows.join('')+'<tr><td colspan="6" class="empty">لا حركة في هذا الشهر.</td></tr>'))+'</tbody></table>';
     fmtInputs(body);
     body.querySelector('#tr-count').onclick=function(){ trForm=trForm==='count'?'':'count'; render(); };
     body.querySelector('#tr-move').onclick=function(){ trForm=trForm==='move'?'':'move'; render(); };
     body.querySelector('#tr-dep').onclick=function(){ trForm=trForm==='dep'?'':'dep'; render(); };
     body.querySelector('#tr-set').onclick=function(){ trForm=trForm==='set'?'':'set'; render(); };
     body.querySelector('#tr-box').onchange=function(){ trBox=this.value; render(); };
+    Array.prototype.forEach.call(body.querySelectorAll('.tm-rm'),function(bt){ bt.onclick=async function(){
+      var dep=bt.dataset.k==='deposit';
+      if(!confirm((dep?'حذف هذا الإيداع؟ سينقص رصيد الصندوق وتتغير أنصبة الشركاء.':'حذف هذا التحويل؟ ترجع الأرصدة كما كانت قبله.'))) return;
+      try{ await w('DELETE','/rest/v1/treasury_moves?id=eq.'+encodeURIComponent(bt.dataset.id)); msg=dep?'حُذف الإيداع.':'حُذف التحويل.'; msgCls='ok'; render(); }catch(e){ say(friendly(e).message,'bad'); } }; });
     body.querySelector('#tr-m').onchange=function(){ if(/^\d{4}-(0[1-9]|1[0-2])$/.test(this.value)){ trMonth=this.value; render(); } else say('اكتب الشهر هكذا: 2026-10','bad'); };
     if(trForm==='set') trBindSetup(body,t,true);
     if(trForm==='count'){
