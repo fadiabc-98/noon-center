@@ -2860,6 +2860,25 @@ label.vip-chk input{width:18px;height:18px;accent-color:#b8860b}
 .pill.vip{background:linear-gradient(135deg,#f6dc7c,#CBA131);color:#4a3500;font-weight:800;border:1px solid #b8901f}
 .btn.vip{background:linear-gradient(135deg,#f6dc7c,#CBA131);color:#4a3500;font-weight:800;border-color:#b8901f}
 html[data-theme="dark"] label.vip-chk{background:linear-gradient(135deg,#4a3b0e,#3a2f0c);color:#f6dc7c}
+
+/* phone fit: the bottom bar and the status pill must never be wider than the screen (they made the whole page slide sideways) */
+html .bnav{max-width:100vw;overflow:hidden}
+html .bnav button{flex:1 1 0;min-width:0;padding-inline:0;font-size:11.5px;white-space:nowrap}
+html .bnav button span{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+#noon-pill{max-width:calc(100vw - 20px);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+
+/* stacked tables on phones */
+@media (max-width:700px){
+  table.stk{display:block;width:100%!important;min-width:0!important;border:0!important;background:none!important}
+  table.stk thead{display:none}
+  table.stk tbody,table.stk tfoot{display:block;width:100%}
+  table.stk tr{display:block;border:1px solid var(--line);border-radius:14px;margin:0 0 9px;padding:6px 10px;background:var(--surface)}
+  table.stk td,table.stk th{display:flex;justify-content:space-between;align-items:center;gap:12px;width:auto!important;border:0!important;padding:5px 2px!important;text-align:end!important;background:none!important}
+  table.stk td[data-label]:not([data-label=""])::before{content:attr(data-label);flex:none;font-weight:700;color:var(--muted);text-align:start}
+  table.stk td:empty{display:none}
+  table.stk td[colspan]{display:block;text-align:center!important}
+  .tablewrap:has(table.stk){border:0;box-shadow:none;background:none}
+}
 </style>
 
 <div id="app" dir="rtl" lang="ar">
@@ -6090,6 +6109,26 @@ document.addEventListener('click',function(e){
   else sheetOverdue();
 });
 (function(){ var _rr=renderReports; renderReports=function(){ _rr.apply(this,arguments); try{ shPanel(); shFill(); }catch(e){ if(window.console) console.error(e); } }; })();
+
+/* ---- phones: a table wider than the screen turns into stacked cards (no sideways scrolling) ---- */
+(function(){
+  var mq=window.matchMedia?window.matchMedia('(max-width:700px)'):null, tm=0;
+  function label(t){
+    var th=[]; var hr=t.querySelector('thead tr'); if(hr) th=[].map.call(hr.children,function(c){ return (c.textContent||'').trim(); });
+    [].forEach.call(t.querySelectorAll('tbody tr'),function(tr){ var i=0; [].forEach.call(tr.children,function(td){ if(td.colSpan>1){ i+=td.colSpan; return; } if(!td.hasAttribute('data-label')) td.setAttribute('data-label',th[i]||''); i++; }); });
+  }
+  function run(){
+    if(!mq||!mq.matches){ [].forEach.call(document.querySelectorAll('table.stk'),function(t){ t.classList.remove('stk'); }); return; }
+    [].forEach.call(document.querySelectorAll('table:not(.stk)'),function(t){
+      var w=t.parentElement; if(!w||t.closest('.overlay.rcpt,.sheet-print')||!t.offsetWidth) return;
+      if(t.offsetWidth>w.clientWidth+1||w.scrollWidth>w.clientWidth+1){ label(t); t.classList.add('stk'); }
+    });
+    [].forEach.call(document.querySelectorAll('table.stk'),label);
+  }
+  function later(){ clearTimeout(tm); tm=setTimeout(run,140); }
+  function start(){ if(!window.MutationObserver) return; new MutationObserver(later).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden','aria-current']}); document.addEventListener('click',later,true); window.addEventListener('resize',later); run(); }
+  if(document.body) start(); else document.addEventListener('DOMContentLoaded',start);
+})();
 
 
 /* ===================== batch D: due date for the remaining amount, siblings, academic-year rollover ===================== */
